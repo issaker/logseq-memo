@@ -131,16 +131,17 @@ export const getSelectedTagPageBlocksIds = async (selectedTag): Promise<string[]
 };
 
 /**
- * Session 快照合并键列表。
- * 字段命名遵循 {owner}_{purpose} 规范：
- * - sm2_*: SM2 算法专属字段
- * - progressive_*: Progressive 算法专属字段
- * - fixed_*: FixedTime 算法字段（用户输入持久化，非算法状态）
- * - 无前缀: 通用/配置字段
+ * Session snapshot merge key list.
+ * Field naming follows the {owner}_{purpose} convention:
+ * - sm2_*: SM2 algorithm-specific fields
+ * - progressive_*: Progressive algorithm-specific fields
+ * - fixed_*: FixedTime algorithm fields (user input persistence, not algorithm state)
+ * - No prefix: universal/config fields
  *
- * 运行时已移除的废弃字段：intervalMultiplierType（运行时不再使用）
- * 迁移工具仍需处理：Data Migration Phase 4 的 FIELDS_TO_DELETE 包含此字段，用于清理旧数据残留
- * 旧字段名兼容映射：由 Data Migration 负责转换，运行时不做兼容
+ * Deprecated fields removed at runtime: intervalMultiplierType (no longer used at runtime)
+ * Migration tool still needs to handle: Data Migration Phase 4's FIELDS_TO_DELETE includes
+ * this field for cleaning up legacy data remnants.
+ * Legacy field name compatibility mapping: handled by Data Migration, no runtime compatibility.
  */
 export const SESSION_SNAPSHOT_KEYS = [
   'algorithm',
@@ -249,11 +250,12 @@ const parseSessionHistory = (sessionChildren, uid) => {
 };
 
 /**
- * 直接解析最新的 session block，不做历史合并。
+ * Parse the latest session block directly without historical merging.
  *
- * 性能优化：当 limitToLatest=true 时，无需从最旧 session 开始逐个合并，
- * 因为 savePracticeData 已全量写入所有字段（含跨算法字段传递），
- * 最新 session block 本身就是完整快照。
+ * Performance optimization: when limitToLatest=true, there is no need to merge
+ * from the oldest session forward, because savePracticeData writes all fields
+ * (including cross-algorithm field pass-through), so the latest session block
+ * itself is already a complete snapshot.
  */
 const parseLatestSession = (sessionChildren, uid) => {
   if (!sessionChildren.length) {

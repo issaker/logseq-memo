@@ -139,13 +139,15 @@ const upsertLatestSessionField = async ({
  * All fields (including algorithm, interaction, nextDueDate)
  * are written to the session block.
  *
- * 同日 Session Block 去重逻辑：
- * 如果当天已有 session block，则更新其标题（emoji 可能变化）并删除旧子字段后重新写入，
- * 而不是创建新的日期 block。这避免了同一卡片在同一天产生多个重复的 session block。
+ * Same-day session block deduplication:
+ * If a session block already exists for today, update its title (emoji may change) and
+ * delete old child fields before rewriting, rather than creating a new date block.
+ * This prevents duplicate session blocks for the same card on the same day.
  *
- * 字段完整性保护：
- * 重写前校验写入数据是否覆盖了 SESSION_SNAPSHOT_KEYS 中的所有已存在字段。
- * 缺失字段从同日 session block 的现有子块中补全，防止"删除全部→重写"策略丢失字段。
+ * Field integrity protection:
+ * Before rewriting, verify that the write data covers all existing fields in SESSION_SNAPSHOT_KEYS.
+ * Missing fields are backfilled from the existing child blocks of the same-day session block,
+ * preventing the "delete all → rewrite" strategy from losing fields.
  */
 export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...data }) => {
   await getOrCreatePage(dataPageTitle);
@@ -225,9 +227,10 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
 
   for (const key of Object.keys(data)) {
     if (data[key] === undefined) continue;
-    // algorithm 和 interaction 在循环后显式写入，确保它们总是位于 session block 末尾。
-    // 这样 parseFieldValuesFromChildren 解析时，后写入的值覆盖先写入的同名值，
-    // 保证最新配置生效（与 deduplicateSessionFields 保留最后一条的逻辑一致）。
+    // algorithm and interaction are written explicitly after the loop to ensure they
+    // always appear at the end of the session block. This way, when parseFieldValuesFromChildren
+    // parses them, later-written values overwrite earlier same-key values, guaranteeing the
+    // latest config takes effect (consistent with deduplicateSessionFields keeping the last entry).
     if (key === 'algorithm') continue;
     if (key === 'interaction') continue;
 

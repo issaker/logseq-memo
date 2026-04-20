@@ -1,24 +1,24 @@
 /**
- * LBL (Line by Line) 逐行复习 Hook。
+ * LBL (Line by Line) Review Hook.
  *
- * 核心架构：子 Block 拥有完整独立的 Session Data。
- * - 每个子 Block 在数据页中有自己的 ((childUid)) 条目
- * - 父级 LBL Block 仅存储 algorithm, interaction, nextDueDate
- * - 子 Block 可随时加入任意牌组成为独立卡片
+ * Core architecture: child blocks have complete, independent Session Data.
+ * - Each child block has its own ((childUid)) entry in the data page
+ * - The parent LBL block only stores algorithm, interaction, and nextDueDate
+ * - Child blocks can join any deck at any time as independent cards
  *
- * 自动跳过逻辑：
- * - 到期/未读子 Block：需要用户交互（Show Answer + 打分 / Read+Next）
- * - 已掌握子 Block：自动显示（降低透明度+绿色边框），无需用户交互
- * - 复习完一个到期子 Block 后，自动前进到下一个到期子 Block
+ * Auto-skip logic:
+ * - Due/unread child blocks: require user interaction (Show Answer + grade / Read+Next)
+ * - Mastered child blocks: auto-displayed (reduced opacity + green border), no user interaction needed
+ * - After reviewing a due child block, auto-advance to the next due child block
  *
- * 插队机制：
- * - LBL + Fixed (LblNext)：Read 后插队，N 张后继续顺延逐行学习
- * - LBL + SM2 Forgot：Forgot 后插队，N 张后继续顺延逐行学习
- * - 插队回来后，从下一个到期子 Block 继续（不从头开始）
+ * Reinsertion mechanism:
+ * - LBL + Fixed (LblNext): reinserted after Read, continues sequential line-by-line after N cards
+ * - LBL + SM2 Forgot: reinserted after Forgot, continues sequential line-by-line after N cards
+ * - After reinsertion returns, resume from the next due child block (not from the beginning)
  *
- * 算法独立原则：
- * - 每个算法只操作自己的字段，其他算法字段原样传递
- * - sessionOverrides 必须包含 algorithm 和 interaction，确保插队后卡片模式不丢失
+ * Algorithm independence principle:
+ * - Each algorithm only operates on its own fields; other algorithm fields are passed through unchanged
+ * - sessionOverrides must include algorithm and interaction to ensure card mode is not lost after reinsertion
  */
 import * as React from 'react';
 import { SchedulingAlgorithm, InteractionStyle, Session, isGradingAlgorithm } from '~/models/session';

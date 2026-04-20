@@ -37,6 +37,7 @@ const LEGACY_MODE_TO_CONFIG: Record<string, { algorithm: SchedulingAlgorithm; in
 import { updateReviewConfig, deduplicateSessionFields } from '~/queries';
 import { getPluginPageData, SESSION_SNAPSHOT_KEYS } from '~/queries/data';
 import { getStringBetween, parseConfigString } from '~/utils/string';
+import { progressiveInterval } from '~/practice';
 
 const CARD_META_BLOCK_NAME = 'meta';
 
@@ -1073,13 +1074,28 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                     const dueDateStr = window.roamAlphaAPI.util.dateToPageTitle(dueDate);
                     fieldsToCreate.push(`nextDueDate:: [[${dueDateStr}]]`);
                   }
-                  if (childData.sm2_interval !== undefined) fieldsToCreate.push(`sm2_interval:: ${childData.sm2_interval}`);
-                  if (childData.sm2_repetitions !== undefined) fieldsToCreate.push(`sm2_repetitions:: ${childData.sm2_repetitions}`);
-                  if (childData.sm2_eFactor !== undefined) fieldsToCreate.push(`sm2_eFactor:: ${typeof childData.sm2_eFactor === 'number' ? childData.sm2_eFactor.toFixed(2) : childData.sm2_eFactor}`);
-                  if (childData.sm2_grade !== undefined) fieldsToCreate.push(`sm2_grade:: ${childData.sm2_grade}`);
-                  if (childData.grade !== undefined) fieldsToCreate.push(`sm2_grade:: ${childData.grade}`);
-                  if (childData.progressive_repetitions !== undefined) fieldsToCreate.push(`progressive_repetitions:: ${childData.progressive_repetitions}`);
-                  if (childData.progressive_interval !== undefined) fieldsToCreate.push(`progressive_interval:: ${childData.progressive_interval}`);
+
+                  const sm2Interval = childData.sm2_interval ?? childData.interval;
+                  if (sm2Interval !== undefined) fieldsToCreate.push(`sm2_interval:: ${sm2Interval}`);
+
+                  const sm2Repetitions = childData.sm2_repetitions ?? childData.repetitions;
+                  if (sm2Repetitions !== undefined) fieldsToCreate.push(`sm2_repetitions:: ${sm2Repetitions}`);
+
+                  const sm2EFactor = childData.sm2_eFactor ?? childData.eFactor;
+                  if (sm2EFactor !== undefined) fieldsToCreate.push(`sm2_eFactor:: ${typeof sm2EFactor === 'number' ? sm2EFactor.toFixed(2) : sm2EFactor}`);
+
+                  const sm2Grade = childData.sm2_grade ?? childData.grade;
+                  if (sm2Grade !== undefined) fieldsToCreate.push(`sm2_grade:: ${sm2Grade}`);
+
+                  const progReps = childData.progressive_repetitions ?? childData.progressiveRepetitions;
+                  if (progReps !== undefined) fieldsToCreate.push(`progressive_repetitions:: ${progReps}`);
+
+                  const progInterval = childData.progressive_interval ?? childData.progressiveInterval;
+                  if (progInterval !== undefined) {
+                    fieldsToCreate.push(`progressive_interval:: ${progInterval}`);
+                  } else if (progReps !== undefined) {
+                    fieldsToCreate.push(`progressive_interval:: ${progressiveInterval(Number(progReps))}`);
+                  }
 
                   for (const fieldString of fieldsToCreate) {
                     await window.roamAlphaAPI.createBlock({

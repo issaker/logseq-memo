@@ -27,9 +27,10 @@
  *   - FixedTime:  Custom time card — user-defined interval via number + unit (blue border)
  *
  *   No backward compatibility policy:
- *   插件不做运行时向后兼容。旧数据必须通过数据迁移面板一次性迁移。
- *   resolveReviewConfig 遇到非法算法值直接回退默认（PROGRESSIVE），不做旧名映射。
- *   这是有意的设计决策，避免长期技术债务。
+ *   The plugin does not provide runtime backward compatibility. Old data must be migrated
+ *   via the data migration panel in a single pass. resolveReviewConfig falls back to the
+ *   default (PROGRESSIVE) for invalid algorithm values without legacy name mapping.
+ *   This is an intentional design decision to avoid long-term technical debt.
  *
  *   LBL architecture:
  *   Child blocks in LBL mode have their own independent Session entries
@@ -148,8 +149,8 @@ export const getAlgorithmIntent = (algorithm: SchedulingAlgorithm | undefined): 
 };
 
 /**
- * 解析算法和交互配置。无效值回退到默认（PROGRESSIVE + NORMAL）。
- * 不做旧名映射——旧数据必须通过数据迁移面板一次性迁移。
+ * Resolve algorithm and interaction config. Invalid values fall back to defaults (PROGRESSIVE + NORMAL).
+ * No legacy name mapping — old data must be migrated via the data migration panel in a single pass.
  */
 export const resolveReviewConfig = (
   rawAlgorithm?: string,

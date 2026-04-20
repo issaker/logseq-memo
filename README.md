@@ -1,6 +1,6 @@
 # Memo - Spaced Repetition for Roam
 
-A spaced repetition plugin for [Roam Research](https://roamresearch.com), using a modified SuperMemo 2 (SM2) algorithm.
+A spaced repetition plugin for [Roam Research](https://roamresearch.com), supporting three scheduling algorithms: SM2, Progressive, and Fixed Time.
 
 ![Demo Preview](https://user-images.githubusercontent.com/1279335/189250105-656e6ba3-7703-46e6-bc71-ee8c5f3e39ab.gif)
 
@@ -66,6 +66,9 @@ Set a daily review limit in settings. ~25% of reviewed cards are new; round-robi
 
 ### Shuffle Cards
 Enable to randomize card order. Default: due cards sorted by urgency (most overdue → lowest eFactor → fewest repetitions). Fixed Time cards use default eFactor (2.5) for moderate queue priority.
+
+### Swap Q/A (Answers First)
+Toggle per-deck via the tag settings menu ("Swap Q/A"). Reverses card presentation — shows answers first, click to reveal the question.
 
 ### Cram Mode
 After finishing due cards, continue reviewing all cards without affecting scheduling.

@@ -80,8 +80,9 @@ export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) 
 
       if (isCompletedToday) {
         if (cardData.interaction === 'LBL') {
-          // LBL 卡片今天完成但 nextDueDate 仍 <= now 时不计入 completed，
-          // 因为子 block 可能未全部完成（nextDueDate 由最早到期子 block 决定）
+          // LBL cards completed today but with nextDueDate still <= now are not counted
+          // as completed, because child blocks may not all be finished (nextDueDate is
+          // determined by the earliest-due child block)
           const now = new Date();
           if (cardData.nextDueDate && cardData.nextDueDate <= now) return;
         }
@@ -168,7 +169,7 @@ export const addNewCards = ({
   }
 };
 
-export const getDueCardUids = (currentTagSessionData: Records, isCramming) => {
+export const getDueCardUids = (currentTagSessionData: Records, isCramming, shuffleCards = false) => {
   const results: RecordUid[] = [];
   if (!Object.keys(currentTagSessionData).length) return results;
 
@@ -184,6 +185,10 @@ export const getDueCardUids = (currentTagSessionData: Records, isCramming) => {
     }
   });
 
+  if (shuffleCards) {
+    return fisherYatesShuffle(results);
+  }
+
   results.sort((a, b) => {
     const aLatestSession = currentTagSessionData[a] as Session;
     const bLatestSession = currentTagSessionData[b] as Session;
@@ -194,14 +199,6 @@ export const getDueCardUids = (currentTagSessionData: Records, isCramming) => {
       return aDueDate.getTime() - bDueDate.getTime();
     }
 
-    // Secondary/tertiary sort uses SM2 fields (sm2_eFactor, sm2_repetitions).
-    // For Fixed/Progressive algorithm cards, these fields are default values
-    // (eFactor=2.5, repetitions=0), meaning they get moderate priority in the
-    // queue — higher than low-urgency SM2 cards (high eFactor) but not the
-    // highest. This is reasonable: Fixed cards follow fixed intervals without
-    // difficulty-based priority, and Progressive cards follow an exponential
-    // curve without difficulty variation. The primary sort (nextDueDate) is
-    // sufficient to distinguish most cards' priority.
     const aEfactor = aLatestSession?.sm2_eFactor ?? 2.5;
     const bEfactor = bLatestSession?.sm2_eFactor ?? 2.5;
     if (aEfactor !== bEfactor) {
@@ -219,11 +216,7 @@ export const getDueCardUids = (currentTagSessionData: Records, isCramming) => {
 export const addDueCards = ({ today, tagsList, sessionData, isCramming, shuffleCards }) => {
   for (const currentTag of tagsList) {
     const currentTagSessionData = sessionData[currentTag];
-    let dueCardsUids = getDueCardUids(currentTagSessionData, isCramming);
-
-    if (shuffleCards) {
-      dueCardsUids = fisherYatesShuffle(dueCardsUids);
-    }
+    const dueCardsUids = getDueCardUids(currentTagSessionData, isCramming, shuffleCards);
 
     today.tags[currentTag] = {
       ...today.tags[currentTag],

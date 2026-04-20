@@ -29,9 +29,13 @@ export const colors = {
 
   // Cloze mask (fixed value — does not change with theme)
   clozeHidden: '#e1e3e5',
+  clozeVisible: 'transparent',
 
   // Border colors
   borderSubtle: 'rgba(128, 128, 128, 0.15)',
+
+  // Text colors
+  textMuted: 'var(--roam-text-muted-color, #888)',
 
   // Algorithm indicator colors (3 algorithms × visual identity)
   modeSM2: 'var(--roam-success-color, #56d364)',         // SM2 = green = memory card
@@ -49,6 +53,8 @@ export const intentColors = {
   success: 'var(--roam-success-color, #56d364)',
   warning: 'var(--roam-warning-color, #d29922)',
   danger: 'var(--roam-danger-color, #f85149)',
+  none: 'inherit',
+  default: 'inherit',
 };
 ```
 

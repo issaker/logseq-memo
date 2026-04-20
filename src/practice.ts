@@ -49,20 +49,21 @@ export const progressiveInterval = (progressive_repetitions: number): number => 
 type PracticeDataResult = Session;
 
 /**
- * 核心调度函数：根据算法计算下一次复习数据。
+ * Core scheduling function: computes next review data based on the algorithm.
  *
- * 字段归属与透传原则：
- * 每个算法输出自己的核心字段 + 通用字段（algorithm, interaction, nextDueDate），
- * 同时透传其他算法的已有字段，防止 savePracticeData 重写 session block 时丢失数据。
- * 透传的字段在下次切换回对应算法时仍可使用，实现算法间无缝切换。
+ * Field ownership and pass-through principle:
+ * Each algorithm outputs its own core fields + common fields (algorithm, interaction, nextDueDate),
+ * while passing through existing fields from other algorithms, preventing data loss when
+ * savePracticeData rewrites the session block. Passed-through fields remain available when
+ * switching back to the corresponding algorithm, enabling seamless algorithm switching.
  *
- * 三条独立路径：
- * - SM2 路径：输出 sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
- *              透传 progressive_repetitions, progressive_interval
- * - Progressive 路径：输出 progressive_repetitions, progressive_interval
- *              透传 sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
- * - FixedTime 路径：输出 fixed_multiplier, fixed_unit
- *              透传 progressive_repetitions, progressive_interval, sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
+ * Three independent paths:
+ * - SM2 path: outputs sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
+ *              passes through progressive_repetitions, progressive_interval
+ * - Progressive path: outputs progressive_repetitions, progressive_interval
+ *              passes through sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
+ * - FixedTime path: outputs fixed_multiplier, fixed_unit
+ *              passes through progressive_repetitions, progressive_interval, sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
  */
 export const generatePracticeData = ({
   dateCreated,

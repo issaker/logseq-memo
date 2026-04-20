@@ -40,7 +40,6 @@ import {
   SchedulingAlgorithm,
   FixedTimeUnit,
   InteractionStyle,
-  ALGORITHM_META,
 } from '~/models/session';
 import useLineByLineReview, { shouldReinsertLblCard } from '~/hooks/useLineByLineReview';
 export { shouldReinsertLblCard };
@@ -201,7 +200,7 @@ const PracticeOverlay = ({
   const isNew = currentCardData && 'isNew' in currentCardData && currentCardData.isNew;
   const nextDueDate = hasNextDueDate ? currentCardData.nextDueDate : undefined;
 
-  const isDueToday = dateUtils.daysBetween(nextDueDate, new Date()) === 0;
+  const isDueToday = nextDueDate ? dateUtils.daysBetween(nextDueDate, new Date()) === 0 : false;
   const status = isNew ? 'new' : isDueToday ? 'dueToday' : hasNextDueDate ? 'pastDue' : null;
 
   const { blockInfo } = useBlockInfo({ refUid: currentCardRefUid });
@@ -228,10 +227,10 @@ const PracticeOverlay = ({
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
-  // LBL 模式判断：interaction 为 LBL 且卡片有子 block
+  // LBL mode check: interaction is LBL and card has child blocks
   const isLBLReview = isLBLReviewMode(interaction) && hasBlockChildrenUids;
 
-  // LBL 活跃状态（用于传递给 useLineByLineReview）
+  // LBL active state (passed to useLineByLineReview)
   const isLineByLineActive = isLBLReview;
 
   const childUidsList = React.useMemo(() => blockInfo.childrenUids || [], [blockInfo.childrenUids]);

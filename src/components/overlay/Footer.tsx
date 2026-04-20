@@ -22,11 +22,12 @@ const formatDaysFromNow = (nextDueDate: Date | undefined): string => {
 };
 
 /**
- * IntervalEstimate 继承 Session 的所有算法字段（sm2_*, progressive_*, fixed_*）。
- * 设计意图：全量继承确保用户在不同算法间切换时，每个算法的历史数据都能被
- * 顺延继承而不会不连贯。例如从 SM2 切换到 Fixed 再切回 SM2 时，
- * SM2 的 eFactor 和 repetitions 仍然保留，间隔计算能从正确位置继续。
- * 排除 baseSessionData 因为间隔预览不需要此嵌套字段。
+ * IntervalEstimate inherits all algorithm fields from Session (sm2_*, progressive_*, fixed_*).
+ * Design intent: full inheritance ensures that when users switch between algorithms, each
+ * algorithm's historical data is carried forward without discontinuity. For example, when
+ * switching from SM2 to Fixed and back to SM2, SM2's eFactor and repetitions are still
+ * preserved, allowing interval calculation to continue from the correct position.
+ * baseSessionData is excluded because interval preview does not need this nested field.
  */
 type IntervalEstimate = Omit<Session, 'baseSessionData'>;
 

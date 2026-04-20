@@ -14,23 +14,23 @@ dayjs.extend(relativeTime);
 import calendar from 'dayjs/plugin/calendar';
 dayjs.extend(calendar);
 
-export const addDays = (date, days) => {
+export const addDays = (date: Date, days: number): Date => {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
 };
 
-export const subtractDays = (date, days) => {
+export const subtractDays = (date: Date, days: number): Date => {
   const result = new Date(date);
   result.setDate(result.getDate() - days);
   return result;
 };
 
-export const daysBetween = (d1, d2) => {
+export const daysBetween = (d1: Date, d2: Date) => {
   const startOfD1 = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate());
   const startOfD2 = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate());
   const oneDay = 24 * 60 * 60 * 1000;
-  return Math.floor(Math.abs((startOfD1 - startOfD2) / oneDay));
+  return Math.floor(Math.abs((startOfD1.getTime() - startOfD2.getTime()) / oneDay));
 };
 
 export const fromNow = (date) => {
