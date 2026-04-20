@@ -49,7 +49,7 @@ export interface CardMeta {
   nextDueDate?: Date;
 }
 
-export interface NewSession extends Omit<Session, 'nextDueDate' | 'sm2_grade'> {
+export interface NewSession extends Omit<Session, 'nextDueDate' | 'sm2_grade' | 'sm2_interval' | 'progressive_interval' | 'baseSessionData'> {
   isNew: boolean;
 }
 
@@ -88,7 +88,7 @@ export type ReviewConfig = {
 };
 
 export const DEFAULT_REVIEW_CONFIG: ReviewConfig = {
-  algorithm: SchedulingAlgorithm.SM2,
+  algorithm: SchedulingAlgorithm.PROGRESSIVE,
   interaction: InteractionStyle.NORMAL,
 };
 
@@ -106,7 +106,7 @@ export type InteractionMeta = {
 
 export const ALGORITHM_META: Record<SchedulingAlgorithm, AlgorithmMeta> = {
   [SchedulingAlgorithm.SM2]: { group: 'Spaced', label: 'SM2' },
-  [SchedulingAlgorithm.PROGRESSIVE]: { group: 'Fixed', label: 'Progressive' },
+  [SchedulingAlgorithm.PROGRESSIVE]: { group: 'Spaced', label: 'Progressive' },
   [SchedulingAlgorithm.FIXED_DAYS]: { group: 'Fixed', label: 'Fixed Days' },
   [SchedulingAlgorithm.FIXED_WEEKS]: { group: 'Fixed', label: 'Fixed Weeks' },
   [SchedulingAlgorithm.FIXED_MONTHS]: { group: 'Fixed', label: 'Fixed Months' },
@@ -130,6 +130,10 @@ export const isSpacedAlgorithm = (algorithm: SchedulingAlgorithm | undefined): b
 
 export const isLBLReviewMode = (interaction?: InteractionStyle): boolean =>
   interaction === InteractionStyle.LBL;
+
+export const isGradingAlgorithm = (algorithm: SchedulingAlgorithm | undefined): boolean => {
+  return algorithm === SchedulingAlgorithm.SM2;
+};
 
 export const getDefaultIntervalMultiplier = (algorithm: SchedulingAlgorithm | undefined): number => {
   if (algorithm === SchedulingAlgorithm.PROGRESSIVE) return 2;

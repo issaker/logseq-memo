@@ -7,12 +7,19 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { isFixedAlgorithm, isLBLReviewMode, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META, Session } from '~/models/session';
+import { isFixedAlgorithm, isGradingAlgorithm, isLBLReviewMode, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META, Session } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { usePracticeSession } from '~/contexts/PracticeSessionContext';
 import { getIntentColor, colors } from '~/theme';
 
-type IntervalEstimate = Session & {
+/**
+ * IntervalEstimate 继承 Session 的所有算法字段（sm2_*, progressive_*, fixed_*）。
+ * 设计意图：全量继承确保用户在不同算法间切换时，每个算法的历史数据都能被
+ * 顺延继承而不会不连贯。例如从 SM2 切换到 Fixed 再切回 SM2 时，
+ * SM2 的 eFactor 和 repetitions 仍然保留，间隔计算能从正确位置继续。
+ * 排除 baseSessionData 因为间隔预览不需要此嵌套字段。
+ */
+type IntervalEstimate = Omit<Session, 'baseSessionData'> & {
   nextDueDateFromNow?: string;
 };
 
@@ -34,7 +41,7 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { intervalMultiplier, baseCardData } = React.useContext(MainContext);
+  const { fixed_multiplier, baseCardData } = React.useContext(MainContext);
   const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
@@ -102,7 +109,7 @@ const Footer = ({
           if (!showAnswers) {
             activateButtonFn('space-button', showAnswerFn);
           } else {
-            if (isFixedAlgorithm(algorithmFromSession)) {
+            if (!isGradingAlgorithm(algorithmFromSession)) {
               intervalPractice();
             } else {
               gradeFn(5);
@@ -133,21 +140,21 @@ const Footer = ({
         global: true,
         label: 'Grade 0',
         onKeyDown: () => gradeFn(0),
-        disabled: isFixedAlgorithm(algorithmFromSession),
+        disabled: !isGradingAlgorithm(algorithmFromSession),
       },
       {
         combo: 'H',
         global: true,
         label: 'Grade 2',
         onKeyDown: () => gradeFn(2),
-        disabled: isFixedAlgorithm(algorithmFromSession),
+        disabled: !isGradingAlgorithm(algorithmFromSession),
       },
       {
         combo: 'G',
         global: true,
         label: 'Grade 4',
         onKeyDown: () => gradeFn(4),
-        disabled: isFixedAlgorithm(algorithmFromSession),
+        disabled: !isGradingAlgorithm(algorithmFromSession),
       },
       {
         combo: 'E',
@@ -173,7 +180,7 @@ const Footer = ({
     const { sm2_interval, sm2_repetitions, sm2_eFactor, progressive_repetitions, progressive_interval } = dataForEstimates;
     const estimates = {};
 
-    const iterateCount = isFixedAlgorithm(algorithmFromSession) ? 1 : grades.length;
+    const iterateCount = !isGradingAlgorithm(algorithmFromSession) ? 1 : grades.length;
     for (let i = 0; i < iterateCount; i++) {
       const grade = grades[i];
       const practiceResultData = generatePracticeData({
@@ -184,14 +191,14 @@ const Footer = ({
         dateCreated: new Date(),
         algorithm: algorithmFromSession,
         interaction: interactionFromSession || InteractionStyle.NORMAL,
-        fixed_multiplier: intervalMultiplier,
+        fixed_multiplier: fixed_multiplier,
         progressive_repetitions,
         progressive_interval,
       });
       estimates[grade] = practiceResultData;
     }
     return estimates;
-  }, [baseCardData, currentCardData, intervalMultiplier, algorithmFromSession]);
+  }, [baseCardData, currentCardData, fixed_multiplier, algorithmFromSession]);
 
   return (
     <FooterWrapper
@@ -286,7 +293,8 @@ const GradingControlsWrapper = ({
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
   const isFixedModeActive = isFixedAlgorithm(algorithm);
-  const isLblNextActive = isLBLReviewMode(interaction) && isFixedAlgorithm(algorithm);
+  const isAutoAdvanceMode = !isGradingAlgorithm(algorithm);
+  const isLblNextActive = isLBLReviewMode(interaction) && isAutoAdvanceMode;
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -337,7 +345,7 @@ const GradingControlsWrapper = ({
           intervalPractice={intervalPractice}
           intervalEstimates={intervalEstimates}
         />
-      ) : isFixedModeActive ? (
+      ) : isAutoAdvanceMode ? (
         <FixedIntervalModeControls
           activeButtonKey={activeButtonKey}
           intervalPractice={intervalPractice}
@@ -420,12 +428,12 @@ const LblNextControls = ({
 
 const FixedIntervalEditor = () => {
   const {
-    intervalMultiplier,
-    setIntervalMultiplier,
+    fixed_multiplier,
+    setFixed_multiplier,
   } = React.useContext(MainContext);
   const handleInputValueChange = (numericValue) => {
     if (isNaN(numericValue)) return;
-    setIntervalMultiplier(numericValue);
+    setFixed_multiplier(numericValue);
   };
 
   return (
@@ -438,7 +446,7 @@ const FixedIntervalEditor = () => {
           stepSize={1}
           majorStepSize={30}
           minorStepSize={1}
-          value={intervalMultiplier}
+          value={fixed_multiplier}
           onValueChange={handleInputValueChange}
           fill
         />
@@ -447,7 +455,7 @@ const FixedIntervalEditor = () => {
   );
 };
 
-const IntervalString = ({ algorithm, intervalMultiplier, nextDueDateFromNow }) => {
+const IntervalString = ({ algorithm, fixed_multiplier, nextDueDateFromNow }) => {
   if (algorithm === SchedulingAlgorithm.PROGRESSIVE) {
     const displayText = nextDueDateFromNow || 'Progressive';
     return (
@@ -458,7 +466,7 @@ const IntervalString = ({ algorithm, intervalMultiplier, nextDueDateFromNow }) =
   }
 
   let singularString = '';
-  if (intervalMultiplier === 1) {
+  if (fixed_multiplier === 1) {
     switch (algorithm) {
       case SchedulingAlgorithm.FIXED_WEEKS:
         singularString += 'Weekly';
@@ -492,7 +500,7 @@ const IntervalString = ({ algorithm, intervalMultiplier, nextDueDateFromNow }) =
           singularString
         ) : (
           <>
-            Every {intervalMultiplier} {unitLabel}
+            Every {fixed_multiplier} {unitLabel}
           </>
         )}
       </span>
@@ -513,8 +521,9 @@ const FixedIntervalModeControls = ({
   toggleIntervalEditorOpen: () => void;
   intervalEstimates: IntervalEstimates;
 }): JSX.Element => {
-  const { intervalMultiplier } = React.useContext(MainContext);
+  const { fixed_multiplier } = React.useContext(MainContext);
   const { algorithm } = usePracticeSession();
+  const isProgressive = algorithm === SchedulingAlgorithm.PROGRESSIVE;
   const onInteractionhandler = (nextState) => {
     if (!nextState && isIntervalEditorOpen) toggleIntervalEditorOpen();
   };
@@ -525,27 +534,45 @@ const FixedIntervalModeControls = ({
 
   return (
     <>
-      <Blueprint.Popover isOpen={isIntervalEditorOpen} onInteraction={onInteractionhandler}>
+      {isProgressive ? (
         <ControlButton
           icon="time"
           className="text-base font-normal py-1"
           intent="default"
-          onClick={toggleIntervalEditorOpen}
-          tooltipText={`Change Interval`}
-          active={activeButtonKey === 'change-interval-button'}
+          tooltipText={`Progressive Interval`}
           outlined
         >
           <span className="ml-2">
             <IntervalString
               algorithm={algorithm}
-              intervalMultiplier={intervalMultiplier}
+              fixed_multiplier={fixed_multiplier}
               nextDueDateFromNow={intervalEstimates[0]?.nextDueDateFromNow}
             />
-            <ButtonTags>E</ButtonTags>
           </span>
         </ControlButton>
-        <FixedIntervalEditor />
-      </Blueprint.Popover>
+      ) : (
+        <Blueprint.Popover isOpen={isIntervalEditorOpen} onInteraction={onInteractionhandler}>
+          <ControlButton
+            icon="time"
+            className="text-base font-normal py-1"
+            intent="default"
+            onClick={toggleIntervalEditorOpen}
+            tooltipText={`Change Interval`}
+            active={activeButtonKey === 'change-interval-button'}
+            outlined
+          >
+            <span className="ml-2">
+              <IntervalString
+                algorithm={algorithm}
+                fixed_multiplier={fixed_multiplier}
+                nextDueDateFromNow={intervalEstimates[0]?.nextDueDateFromNow}
+              />
+              <ButtonTags>E</ButtonTags>
+            </span>
+          </ControlButton>
+          <FixedIntervalEditor />
+        </Blueprint.Popover>
+      )}
       <ControlButton
         icon="tick"
         className="text-base font-medium py-1"

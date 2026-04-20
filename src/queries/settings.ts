@@ -155,9 +155,6 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
             case 'lblNextReinsertOffset':
               loadedSettings.lblNextReinsertOffset = Number(value) || 3;
               break;
-            case 'readReinsertOffset':
-              loadedSettings.lblNextReinsertOffset = Number(value) || 3;
-              break;
             case 'showBreadcrumbs':
               loadedSettings.showBreadcrumbs = value === 'true';
               break;

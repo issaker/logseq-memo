@@ -29,7 +29,7 @@
  */
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
-import { SchedulingAlgorithm, InteractionStyle, isFixedAlgorithm } from '~/models/session';
+import { SchedulingAlgorithm, InteractionStyle, isGradingAlgorithm } from '~/models/session';
 import {
   createChildBlock,
   getChildBlock,
@@ -50,7 +50,7 @@ const NUMERIC_SESSION_KEYS = [
 ];
 
 const getEmojiFromGrade = (grade, algorithm?: string) => {
-  if (grade === undefined && isFixedAlgorithm(algorithm as SchedulingAlgorithm)) {
+  if (grade === undefined && !isGradingAlgorithm(algorithm as SchedulingAlgorithm)) {
     return '🟢';
   }
   switch (grade) {

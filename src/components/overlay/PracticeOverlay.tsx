@@ -33,7 +33,9 @@ import LineByLineView from '~/components/overlay/LineByLineView';
 import SettingsDialog from '~/components/overlay/SettingsDialog';
 import {
   Session,
+  NewSession,
   isFixedAlgorithm,
+  isGradingAlgorithm,
   isLBLReviewMode,
   SchedulingAlgorithm,
   InteractionStyle,
@@ -52,8 +54,8 @@ import { colors } from '~/theme';
 import { usePracticeSession, PracticeSessionContext } from '~/contexts/PracticeSessionContext';
 
 interface MainContextProps {
-  intervalMultiplier: number;
-  setIntervalMultiplier: (multiplier: number) => void;
+  fixed_multiplier: number;
+  setFixed_multiplier: (multiplier: number) => void;
   onPracticeClick: (props: handlePracticeProps) => void;
   currentIndex: number;
   renderMode: RenderMode;
@@ -141,7 +143,7 @@ const PracticeOverlay = ({
   const totalCardsCount = (todaySelectedTag?.new || 0) + (todaySelectedTag?.due || 0);
   const hasCards = totalCardsCount > 0;
 
-  const [intervalMultiplier, setIntervalMultiplier] = React.useState<number>(
+  const [fixed_multiplier, setFixed_multiplier] = React.useState<number>(
     currentCardData?.fixed_multiplier || currentCardData?.progressive_interval || getDefaultIntervalMultiplier(algorithm)
   );
 
@@ -159,7 +161,7 @@ const PracticeOverlay = ({
   // Track previous card UID so the interval state is only initialised
   // when the card changes — not on every polling update that touches
   // currentCardData.  This prevents the 1s poll from overwriting a
-  // user's manual intervalMultiplier selection.
+  // user's manual fixed_multiplier selection.
   const prevCardRefUidRef = React.useRef<string | undefined>();
 
   // Reset interval state when navigating to a different card.
@@ -167,7 +169,7 @@ const PracticeOverlay = ({
   // of currentCardData, because currentCardData is updated asynchronously by
   // useCurrentCardData's effect and is stale during the first render after
   // a card change. Using stale currentCardData would copy the PREVIOUS card's
-  // intervalMultiplier into the new card, and the cardChanged guard would
+  // fixed_multiplier into the new card, and the cardChanged guard would
   // prevent correction on the subsequent render.
   React.useEffect(() => {
     const cardChanged = prevCardRefUidRef.current !== currentCardRefUid;
@@ -180,11 +182,11 @@ const PracticeOverlay = ({
     const algo = latestSession.algorithm as SchedulingAlgorithm | undefined;
 
     if (algo === SchedulingAlgorithm.PROGRESSIVE) {
-      setIntervalMultiplier(latestSession.progressive_interval || getDefaultIntervalMultiplier(algo));
+      setFixed_multiplier(latestSession.progressive_interval || getDefaultIntervalMultiplier(algo));
     } else if (isFixedAlgorithm(algo)) {
-      setIntervalMultiplier(latestSession.fixed_multiplier || getDefaultIntervalMultiplier(algo));
+      setFixed_multiplier(latestSession.fixed_multiplier || getDefaultIntervalMultiplier(algo));
     } else {
-      setIntervalMultiplier(getDefaultIntervalMultiplier(algo));
+      setFixed_multiplier(getDefaultIntervalMultiplier(algo));
     }
   }, [latestSession, currentCardRefUid]);
 
@@ -269,13 +271,13 @@ const PracticeOverlay = ({
     const effectiveInteraction = (latestSession?.interaction || interaction) as InteractionStyle | undefined;
     const effectiveAlgorithm = (latestSession?.algorithm || algorithm) as SchedulingAlgorithm | undefined;
     const effectiveIsLBL = isLBLReviewMode(effectiveInteraction) && hasBlockChildrenUids;
-    const effectiveIsLblNext = effectiveIsLBL && isFixedAlgorithm(effectiveAlgorithm);
+    const effectiveIsLblNext = effectiveIsLBL && !isGradingAlgorithm(effectiveAlgorithm);
 
     if (effectiveIsLblNext) {
       setShowAnswers(true);
     } else if (effectiveIsLBL) {
       setShowAnswers(false);
-    } else if (isFixedAlgorithm(effectiveAlgorithm)) {
+    } else if (!isGradingAlgorithm(effectiveAlgorithm)) {
       setShowAnswers(true);
     } else if (hasBlockChildren || hasCloze) {
       setShowAnswers(false);
@@ -332,12 +334,14 @@ const PracticeOverlay = ({
       const practiceProps = {
         ...baseData,
         ...gradeData,
-        fixed_multiplier: intervalMultiplier,
+        fixed_multiplier: fixed_multiplier,
         algorithm,
         interaction,
       };
 
-      const isReScoring = currentCardData?.dateCreated
+      const isNewCard = currentCardRefUid && (practiceData[currentCardRefUid] as NewSession)?.isNew;
+      const isReScoring = !isNewCard
+        && currentCardData?.dateCreated
         && dateUtils.isSameDay(currentCardData.dateCreated, new Date())
         && currentCardData.sm2_grade !== 0;
       if (isReScoring) {
@@ -385,7 +389,7 @@ const PracticeOverlay = ({
       currentCardData,
       algorithm,
       interaction,
-      intervalMultiplier,
+      fixed_multiplier,
       currentCardRefUid,
       forgotReinsertOffset,
       isCramming,
@@ -491,29 +495,28 @@ const PracticeOverlay = ({
   const onSelectAlgorithm = React.useCallback(
     async (newAlgorithm: SchedulingAlgorithm) => {
       if (!currentCardRefUid) return;
-
-      const currentInteraction = interaction || InteractionStyle.NORMAL;
+      if (!interaction) throw new Error('interaction is undefined in onSelectAlgorithm');
 
       setSessionOverrides((prev) => ({
         ...prev,
         [currentCardRefUid]: {
           ...currentCardData,
           algorithm: newAlgorithm,
-          interaction: currentInteraction,
+          interaction: interaction,
         },
       }));
 
       applyOptimisticCardMeta({
         ...cardMeta,
         algorithm: newAlgorithm,
-        interaction: currentInteraction,
+        interaction: interaction,
       });
 
       await updateReviewConfig({
         refUid: currentCardRefUid,
         dataPageTitle,
         algorithm: newAlgorithm,
-        interaction: currentInteraction,
+        interaction: interaction,
       });
 
       fetchPracticeData();
@@ -532,28 +535,27 @@ const PracticeOverlay = ({
   const onSelectInteraction = React.useCallback(
     async (newInteraction: InteractionStyle) => {
       if (!currentCardRefUid) return;
-
-      const currentAlgorithm = algorithm || SchedulingAlgorithm.SM2;
+      if (!algorithm) throw new Error('algorithm is undefined in onSelectInteraction');
 
       setSessionOverrides((prev) => ({
         ...prev,
         [currentCardRefUid]: {
           ...currentCardData,
-          algorithm: currentAlgorithm,
+          algorithm: algorithm,
           interaction: newInteraction,
         },
       }));
 
       applyOptimisticCardMeta({
         ...cardMeta,
-        algorithm: currentAlgorithm,
+        algorithm: algorithm,
         interaction: newInteraction,
       });
 
       await updateReviewConfig({
         refUid: currentCardRefUid,
         dataPageTitle,
-        algorithm: currentAlgorithm,
+        algorithm: algorithm,
         interaction: newInteraction,
       });
 
@@ -586,8 +588,8 @@ const PracticeOverlay = ({
     >
     <MainContext.Provider
       value={{
-        intervalMultiplier,
-        setIntervalMultiplier,
+        fixed_multiplier,
+        setFixed_multiplier,
         onPracticeClick,
         currentIndex,
         renderMode,

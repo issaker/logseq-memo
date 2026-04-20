@@ -149,9 +149,9 @@ roam/memo (page)
 
 **Key principles**:
 - The latest session block is the single source of truth
-- Field naming follows `{owner}_{purpose}` convention: `sm2_*`, `progressive_*`, `fixed_*`, `lbl_*`
+- Field naming follows `{owner}_{purpose}` convention: `sm2_*`, `progressive_*`, `fixed_*`
 - Each algorithm only modifies its OWN fields; other fields are inherited unchanged → switching algorithms never loses data
-- `lbl_progress` stores per-child scheduling data as JSON
+- LBL child blocks have independent sessions (legacy `lbl_progress` has been migrated)
 - `progressive_interval` is the calculated interval (2→6→12→24→48→96 days) based on `progressive_repetitions`
 
 ### Settings Architecture

@@ -8,7 +8,7 @@
  * Phase 3: Convert reviewMode → algorithm + interaction in session blocks
  * Phase 4: Deduplicate algorithm/interaction fields + rename old field names to {owner}_{purpose} convention + convert READ → LBL
  * Phase 5: Compact latest session snapshots (fill missing fields from merged history)
- * Phase 6: Migrate lbl_progress / lineByLineProgress to independent child block sessions
+ * Phase 6: Migrate legacy lbl_progress / lineByLineProgress to independent child block sessions
  */
 import * as React from 'react';
 import { Alert } from '@blueprintjs/core';
@@ -935,7 +935,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         total,
         migrated,
         skipped,
-        phase: 'Phase 6: Migrating lbl_progress to child block sessions',
+        phase: 'Phase 6: Migrating legacy lbl_progress to child block sessions',
       });
 
       let phase6Migrated = 0;
@@ -1167,7 +1167,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         <p>
           This migration will convert <strong>reviewMode</strong> fields to the new{' '}
           <strong>algorithm</strong> + <strong>interaction</strong> format, rename legacy field names,
-          delete redundant fields, and migrate <strong>lbl_progress</strong> data to independent
+          delete redundant fields, and migrate legacy <strong>lbl_progress</strong> data to independent
           child block sessions.
         </p>
         {scanResult && (

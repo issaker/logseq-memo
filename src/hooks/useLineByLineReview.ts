@@ -21,7 +21,7 @@
  * - sessionOverrides 必须包含 algorithm 和 interaction，确保插队后卡片模式不丢失
  */
 import * as React from 'react';
-import { SchedulingAlgorithm, InteractionStyle, Session, isFixedAlgorithm } from '~/models/session';
+import { SchedulingAlgorithm, InteractionStyle, Session, isGradingAlgorithm } from '~/models/session';
 import { savePracticeData, updateParentNextDueDate } from '~/queries';
 import { generatePracticeData, progressiveInterval, supermemo } from '~/practice';
 import { generateNewSession } from '~/queries/utils';
@@ -113,7 +113,7 @@ export default function useLineByLineReview({
   setCardQueue,
   childSessionData,
 }: UseLineByLineReviewInput): UseLineByLineReviewOutput {
-  const isLblNext = isFixedAlgorithm(algorithm);
+  const isLblNext = !isGradingAlgorithm(algorithm);
 
   const [lineByLineRevealedCount, setLineByLineRevealedCount] = React.useState(0);
   const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);

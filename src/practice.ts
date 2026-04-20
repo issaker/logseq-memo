@@ -2,7 +2,6 @@ import { savePracticeData } from '~/queries/save';
 import * as dateUtils from '~/utils/date';
 import {
   SchedulingAlgorithm,
-  isSpacedAlgorithm,
   Session,
 } from '~/models/session';
 
@@ -60,6 +59,11 @@ type PracticeDataResult = Session & { nextDueDateFromNow?: string };
  *
  * Mode Independence Principle（模式独立原则）：
  * 每个算法只操作自己的字段，其他算法的字段原样传递，确保切换算法不丢失数据。
+ * 这确保了用户在不同算法间切换时，历史数据不会丢失。
+ * 例如：从 Progressive 切换到 Fixed 后再切回 Progressive，
+ * progressive_repetitions 仍然保留，间隔曲线能从正确位置继续。
+ *
+ * 三条独立路径：
  * - SM2 路径：计算 sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
  * - Progressive 路径：计算 progressive_repetitions, progressive_interval
  * - Fixed 路径：计算 fixed_multiplier
@@ -77,9 +81,7 @@ export const generatePracticeData = ({
 }: Session): PracticeDataResult => {
   const referenceDate = dateCreated || new Date();
 
-  const useSpacedPath = isSpacedAlgorithm(algorithm);
-
-  if (useSpacedPath) {
+  if (algorithm === SchedulingAlgorithm.SM2) {
     const {
       sm2_grade,
       sm2_interval,
@@ -111,6 +113,35 @@ export const generatePracticeData = ({
     };
   }
 
+  if (algorithm === SchedulingAlgorithm.PROGRESSIVE) {
+    const {
+      progressive_repetitions,
+      sm2_repetitions,
+      sm2_eFactor,
+      sm2_interval,
+      sm2_grade,
+      fixed_multiplier,
+    } = props;
+    const currentProgReps = progressive_repetitions || 0;
+    const calculatedInterval = progressiveInterval(currentProgReps);
+    const nextDueDate = dateUtils.addDays(referenceDate, calculatedInterval);
+
+    return {
+      algorithm,
+      interaction,
+      progressive_interval: calculatedInterval,
+      progressive_repetitions: currentProgReps + 1,
+      ...(sm2_repetitions !== undefined && { sm2_repetitions }),
+      ...(sm2_eFactor !== undefined && { sm2_eFactor }),
+      ...(sm2_interval !== undefined && { sm2_interval }),
+      ...(sm2_grade !== undefined && { sm2_grade }),
+      ...(fixed_multiplier !== undefined && { fixed_multiplier }),
+      dateCreated: referenceDate,
+      nextDueDate,
+      nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
+    };
+  }
+
   const {
     fixed_multiplier,
     progressive_repetitions,
@@ -120,44 +151,32 @@ export const generatePracticeData = ({
     sm2_grade,
   } = props;
   let nextDueDate: Date | undefined;
-  let calculatedIntervalMultiplier = fixed_multiplier;
+  let calculatedMultiplier = fixed_multiplier;
 
   switch (algorithm) {
-    case SchedulingAlgorithm.PROGRESSIVE: {
-      const currentProgReps = progressive_repetitions || 0;
-      calculatedIntervalMultiplier = progressiveInterval(currentProgReps);
-      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier);
-      break;
-    }
     case SchedulingAlgorithm.FIXED_DAYS:
-      calculatedIntervalMultiplier = fixed_multiplier || 3;
-      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier);
+      calculatedMultiplier = fixed_multiplier || 3;
+      nextDueDate = dateUtils.addDays(referenceDate, calculatedMultiplier);
       break;
     case SchedulingAlgorithm.FIXED_WEEKS:
-      calculatedIntervalMultiplier = fixed_multiplier || 3;
-      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier * 7);
+      calculatedMultiplier = fixed_multiplier || 3;
+      nextDueDate = dateUtils.addDays(referenceDate, calculatedMultiplier * 7);
       break;
     case SchedulingAlgorithm.FIXED_MONTHS:
-      calculatedIntervalMultiplier = fixed_multiplier || 3;
-      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier * 30);
+      calculatedMultiplier = fixed_multiplier || 3;
+      nextDueDate = dateUtils.addDays(referenceDate, calculatedMultiplier * 30);
       break;
     case SchedulingAlgorithm.FIXED_YEARS:
-      calculatedIntervalMultiplier = fixed_multiplier || 3;
-      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier * 365);
+      calculatedMultiplier = fixed_multiplier || 3;
+      nextDueDate = dateUtils.addDays(referenceDate, calculatedMultiplier * 365);
       break;
   }
-
-  const isProgressive = algorithm === SchedulingAlgorithm.PROGRESSIVE;
 
   return {
     algorithm,
     interaction,
-    ...(isProgressive
-      ? { progressive_interval: calculatedIntervalMultiplier }
-      : { fixed_multiplier: calculatedIntervalMultiplier }),
-    progressive_repetitions: isProgressive
-      ? (progressive_repetitions || 0) + 1
-      : progressive_repetitions,
+    fixed_multiplier: calculatedMultiplier,
+    ...(progressive_repetitions !== undefined && { progressive_repetitions }),
     ...(sm2_repetitions !== undefined && { sm2_repetitions }),
     ...(sm2_eFactor !== undefined && { sm2_eFactor }),
     ...(sm2_interval !== undefined && { sm2_interval }),

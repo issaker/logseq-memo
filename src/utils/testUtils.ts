@@ -280,6 +280,7 @@ export class MockDataBuilder {
       algorithm: SchedulingAlgorithm.SM2,
       interaction: InteractionStyle.NORMAL,
       isNew: false,
+      dateCreated: new Date(),
     });
 
     this.sessions[uid].push({
@@ -353,6 +354,7 @@ export class MockDataBuilder {
 }
 
 export function mockDateToRoamDateString(date) {
+  if (!date) return '[[January 1st, 2026]]';
   const months = [
     'January',
     'February',

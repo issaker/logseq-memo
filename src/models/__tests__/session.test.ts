@@ -58,10 +58,10 @@ describe('resolveReviewConfig', () => {
   });
 
   describe('invalid or missing inputs', () => {
-    it('defaults algorithm to SM2 when algorithm is invalid but interaction is valid', () => {
+    it('defaults algorithm to PROGRESSIVE when algorithm is invalid but interaction is valid', () => {
       const result = resolveReviewConfig('INVALID_ALGO', 'NORMAL');
       expect(result).toEqual({
-        algorithm: SchedulingAlgorithm.SM2,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
         interaction: InteractionStyle.NORMAL,
       });
     });
@@ -83,9 +83,9 @@ describe('resolveReviewConfig', () => {
       expect(resolveReviewConfig()).toEqual(DEFAULT_REVIEW_CONFIG);
     });
 
-    it('defaults algorithm to SM2 when only interaction is provided and valid', () => {
+    it('defaults algorithm to PROGRESSIVE when only interaction is provided and valid', () => {
       expect(resolveReviewConfig(undefined, 'LBL')).toEqual({
-        algorithm: SchedulingAlgorithm.SM2,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
         interaction: InteractionStyle.LBL,
       });
     });

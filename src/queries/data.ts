@@ -136,7 +136,6 @@ export const getSelectedTagPageBlocksIds = async (selectedTag): Promise<string[]
  * - sm2_*: SM2 算法专属字段
  * - progressive_*: Progressive 算法专属字段
  * - fixed_*: Fixed 间隔算法专属字段
- * - lbl_*: LBL 交互模式专属字段
  * - 无前缀: 通用/配置字段
  *
  * 已移除的废弃字段：intervalMultiplierType（幽灵字段，无实际用途）

@@ -14,7 +14,6 @@ import {
   NewSession,
   SchedulingAlgorithm,
   InteractionStyle,
-  isSpacedAlgorithm,
 } from '~/models/session';
 
 export const parentChainInfoQuery = `[
@@ -272,21 +271,19 @@ export const generateNewSession = ({
   dateCreated?: Date;
   isNew?: boolean;
 } = {}): NewSession => {
-  const effectiveAlgorithm = algorithm ?? SchedulingAlgorithm.SM2;
+  const effectiveAlgorithm = algorithm ?? SchedulingAlgorithm.PROGRESSIVE;
   const effectiveInteraction = interaction ?? InteractionStyle.NORMAL;
-  const isSpaced = isSpacedAlgorithm(effectiveAlgorithm);
 
   const baseSession: Omit<NewSession, 'isNew'> = {
-    dateCreated: dateCreated || new Date(),
+    dateCreated,
     algorithm: effectiveAlgorithm,
     interaction: effectiveInteraction,
   };
 
-  if (isSpaced) {
+  if (effectiveAlgorithm === SchedulingAlgorithm.SM2) {
     return {
       ...baseSession,
       sm2_eFactor: 2.5,
-      sm2_interval: 0,
       sm2_repetitions: 0,
       isNew,
     };
@@ -295,7 +292,6 @@ export const generateNewSession = ({
   if (effectiveAlgorithm === SchedulingAlgorithm.PROGRESSIVE) {
     return {
       ...baseSession,
-      progressive_interval: 2,
       progressive_repetitions: 0,
       isNew,
     };

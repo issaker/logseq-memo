@@ -193,9 +193,13 @@ export const getDueCardUids = (currentTagSessionData: Records, isCramming) => {
     }
 
     // Secondary/tertiary sort uses SM2 fields (sm2_eFactor, sm2_repetitions).
-    // For Fixed algorithm cards, these default to 2.5 and 0 respectively,
-    // which is intentional: Fixed cards get moderate priority in the queue —
-    // higher than low-urgency SM2 cards (high eFactor) but not the highest.
+    // For Fixed/Progressive algorithm cards, these fields are default values
+    // (eFactor=2.5, repetitions=0), meaning they get moderate priority in the
+    // queue — higher than low-urgency SM2 cards (high eFactor) but not the
+    // highest. This is reasonable: Fixed cards follow fixed intervals without
+    // difficulty-based priority, and Progressive cards follow an exponential
+    // curve without difficulty variation. The primary sort (nextDueDate) is
+    // sufficient to distinguish most cards' priority.
     const aEfactor = aLatestSession?.sm2_eFactor ?? 2.5;
     const bEfactor = bLatestSession?.sm2_eFactor ?? 2.5;
     if (aEfactor !== bEfactor) {

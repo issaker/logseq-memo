@@ -1,17 +1,8 @@
 import * as React from 'react';
 import { colors } from '~/theme';
+import { Settings } from '~/hooks/useSettings';
 
-export interface SettingsFormSettings {
-  tagsListString: string;
-  dataPageTitle: string;
-  dailyLimit: number;
-  forgotReinsertOffset: number;
-  lblNextReinsertOffset: number;
-  showModeBorders: boolean;
-  rtlEnabled: boolean;
-  shuffleCards: boolean;
-  dailynoteEnabled: boolean;
-}
+export type SettingsFormSettings = Omit<Settings, 'historyCleanupKeepCount' | 'showBreadcrumbs'>;
 
 export interface SettingsFormHandle {
   getSettings: () => SettingsFormSettings;

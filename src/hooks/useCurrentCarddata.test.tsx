@@ -12,7 +12,7 @@ describe('useCurrentCardData', () => {
 
   it('should return current card when review mode unchanged', async () => {
     const currentCardRefUid = 'id_0';
-    const currentCardData = generateNewSession({ isNew: false });
+    const currentCardData = generateNewSession({ isNew: false, dateCreated: new Date() });
     const practiceData = {
       [currentCardRefUid]: [currentCardData],
     };
@@ -41,7 +41,7 @@ describe('useCurrentCardData', () => {
   it('returns undefined when currentCardRefUid becomes undefined (on complete)', async () => {
     const { result } = renderHook(() => {
       const [currentCardRefUid, setCurrentCardRefUid] = React.useState<string | undefined>('id_0');
-      const currentCardData = generateNewSession({ isNew: false });
+      const currentCardData = generateNewSession({ isNew: false, dateCreated: new Date() });
       const practiceData = {
         ['id_0']: [currentCardData],
       };
@@ -69,6 +69,7 @@ describe('useCurrentCardData', () => {
       algorithm: SchedulingAlgorithm.SM2,
       interaction: InteractionStyle.NORMAL,
       isNew: false,
+      dateCreated: new Date(),
     });
 
     const sessions = [session];
@@ -94,7 +95,7 @@ describe('useCurrentCardData', () => {
       })
     );
 
-    expect(result.current.algorithm).toEqual(SchedulingAlgorithm.SM2);
+    expect(result.current.algorithm).toEqual(SchedulingAlgorithm.PROGRESSIVE);
   });
 
   describe('Card navigation', () => {
@@ -177,6 +178,7 @@ describe('useCurrentCardData', () => {
           algorithm: SchedulingAlgorithm.SM2,
           interaction: InteractionStyle.LBL,
           isNew: false,
+          dateCreated: new Date(),
         }),
       };
 
@@ -197,6 +199,7 @@ describe('useCurrentCardData', () => {
         algorithm: SchedulingAlgorithm.PROGRESSIVE,
         interaction: InteractionStyle.NORMAL,
         isNew: false,
+        dateCreated: new Date(),
       });
 
       const { result } = renderHook(() =>

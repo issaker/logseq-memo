@@ -187,7 +187,7 @@ describe('getPluginPageData', () => {
     });
   });
 
-  it('defaults algorithm to SM2 and interaction to NORMAL when session block has none', async () => {
+  it('defaults algorithm to PROGRESSIVE and interaction to NORMAL when session block has none', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [
@@ -223,7 +223,7 @@ describe('getPluginPageData', () => {
     expect(result['card-fixed']).toMatchObject({
       dateCreated: new Date('2026-04-14T00:00:00.000Z'),
       nextDueDate: new Date('2026-04-20T00:00:00.000Z'),
-      algorithm: 'SM2',
+      algorithm: 'PROGRESSIVE',
       interaction: 'NORMAL',
     });
   });

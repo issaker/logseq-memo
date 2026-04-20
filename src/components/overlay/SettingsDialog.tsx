@@ -59,7 +59,7 @@ const SettingsDialog = ({
           <span style={{ fontSize: '14px', fontWeight: 600 }}>Data Migration</span>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 10px 0' }}>
             Migrate card data to the current architecture: convert reviewMode fields to algorithm +
-            interaction, rename legacy field names, remove redundant fields, and migrate lbl_progress
+            interaction, rename legacy field names, remove redundant fields, and migrate legacy lbl_progress
             to independent child block sessions. Safe to run multiple times.
           </p>
           <MigrateLegacyDataPanel dataPageTitle={dataPageTitle} />
