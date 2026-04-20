@@ -105,12 +105,6 @@ const useSettings = () => {
     }
   }, [settings.tagsListString]);
 
-  React.useEffect(() => {
-    window.roamMemo.extensionAPI.settings.panel.create(
-      settingsPanelConfig({ settings, setSettings })
-    );
-  }, [setSettings]);
-
   // One-time startup: load page data into extensionAPI if it's empty (roam/js cold start)
   const syncPageToExtensionAPI = React.useCallback(
     async (dataPageTitle: string) => {
@@ -157,20 +151,16 @@ const useSettings = () => {
     hasInitializedRef.current = true;
 
     const initialize = async () => {
-      const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
-      const hasExistingSettings = SETTING_KEYS.some((key) => key in allSettings);
-
-      if (!hasExistingSettings) {
-        // Cold start (roam/js): no in-memory settings → load from page
-        const loaded = await syncPageToExtensionAPI(defaultSettings.dataPageTitle);
-        if (!loaded) {
+      const loaded = await syncPageToExtensionAPI(defaultSettings.dataPageTitle);
+      if (!loaded) {
+        const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
+        const hasExistingSettings = SETTING_KEYS.some((key) => key in allSettings);
+        if (!hasExistingSettings) {
           ensureAllDefaults();
         }
-      } else {
-        // Warm start: extensionAPI has data → just fill missing defaults
-        ensureAllDefaults();
       }
 
+      ensureAllDefaults();
       syncSettingsFromAPI();
     };
 
@@ -249,6 +239,12 @@ const useSettings = () => {
     },
     [schedulePageSync]
   );
+
+  React.useEffect(() => {
+    window.roamMemo.extensionAPI.settings.panel.create(
+      settingsPanelConfig({ settings, updateSetting })
+    );
+  }, [updateSetting]);
 
   return { settings, updateSetting };
 };

@@ -4,19 +4,14 @@ import MigrateLegacyDataPanel from '~/components/MigrateLegacyDataPanel';
 import SettingsForm, { SettingsFormHandle, SettingsFormSettings } from '~/components/SettingsForm';
 import { defaultSettings } from './hooks/useSettings';
 
-const settingsPanelConfig = ({ settings, setSettings }) => {
+const settingsPanelConfig = ({ settings, updateSetting }) => {
   const formRef = React.createRef<SettingsFormHandle>();
 
-  const syncFn = async ({ key, value }: { key: string; value: any }) => {
-    window.roamMemo.extensionAPI.settings.set(key, value);
-    setSettings((currentSettings) => {
-      return { ...currentSettings, [key]: value };
-    });
-  };
+  const processChange = asyncUtils.debounce(({ key, value }) => {
+    updateSetting(key, value);
+  });
 
-  const processChange = asyncUtils.debounce((e) => syncFn(e));
-
-  const updateSetting = (key: string, value: any) => {
+  const updateSettingDebounced = (key: string, value: any) => {
     processChange({ key, value });
   };
 
@@ -24,7 +19,7 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
     const formSettings = formRef.current?.getSettings();
     if (formSettings) {
       (Object.keys(formSettings) as (keyof SettingsFormSettings)[]).forEach((key) => {
-        updateSetting(key, formSettings[key]);
+        updateSettingDebounced(key, formSettings[key]);
       });
     }
   };
