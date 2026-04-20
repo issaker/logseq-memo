@@ -71,4 +71,18 @@ describe('daysBetween', () => {
 
     expect(dateUtils.daysBetween(lastWeek, today)).toEqual(7);
   });
+
+  test('Today afternoon vs tomorrow midnight returns 1', () => {
+    const todayAfternoon = new Date(2026, 3, 21, 15, 0, 0);
+    const tomorrowMidnight = new Date(2026, 3, 22, 0, 0, 0);
+
+    expect(dateUtils.daysBetween(todayAfternoon, tomorrowMidnight)).toEqual(1);
+  });
+
+  test('Today morning vs yesterday midnight returns 1', () => {
+    const todayMorning = new Date(2026, 3, 21, 9, 0, 0);
+    const yesterdayMidnight = new Date(2026, 3, 20, 0, 0, 0);
+
+    expect(dateUtils.daysBetween(todayMorning, yesterdayMidnight)).toEqual(1);
+  });
 });

@@ -27,8 +27,10 @@ export const subtractDays = (date, days) => {
 };
 
 export const daysBetween = (d1, d2) => {
+  const startOfD1 = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate());
+  const startOfD2 = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate());
   const oneDay = 24 * 60 * 60 * 1000;
-  return Math.floor(Math.abs((d1 - d2) / oneDay));
+  return Math.floor(Math.abs((startOfD1 - startOfD2) / oneDay));
 };
 
 export const fromNow = (date) => {
