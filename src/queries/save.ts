@@ -26,6 +26,8 @@
  * The meta block has been removed. algorithm and interaction are now
  * stored in each session record alongside algorithm-specific fields.
  * The interaction value (NORMAL or LBL) encodes the review mode.
+ *
+ * Three algorithms: SM2 (memory), Progressive (reading), FixedTime (custom time).
  */
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
@@ -209,11 +211,13 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
     );
   }
 
-  const nextDueDate = data.nextDueDate || dateUtils.addDays(referenceDate, data.sm2_interval);
+  const nextDueDate = data.nextDueDate !== undefined ? data.nextDueDate : dateUtils.addDays(referenceDate, data.sm2_interval);
 
   for (const key of Object.keys(data)) {
     if (data[key] === undefined) continue;
-    // algorithm 和 interaction 在循环后显式写入，确保它们总是位于 session block 末尾
+    // algorithm 和 interaction 在循环后显式写入，确保它们总是位于 session block 末尾。
+    // 这样 parseFieldValuesFromChildren 解析时，后写入的值覆盖先写入的同名值，
+    // 保证最新配置生效（与 deduplicateSessionFields 保留最后一条的逻辑一致）。
     if (key === 'algorithm') continue;
     if (key === 'interaction') continue;
 

@@ -28,30 +28,9 @@ describe('resolveReviewConfig', () => {
       });
     });
 
-    it('resolves FIXED_DAYS + NORMAL', () => {
-      expect(resolveReviewConfig('FIXED_DAYS', 'NORMAL')).toEqual({
-        algorithm: SchedulingAlgorithm.FIXED_DAYS,
-        interaction: InteractionStyle.NORMAL,
-      });
-    });
-
-    it('resolves FIXED_WEEKS + NORMAL', () => {
-      expect(resolveReviewConfig('FIXED_WEEKS', 'NORMAL')).toEqual({
-        algorithm: SchedulingAlgorithm.FIXED_WEEKS,
-        interaction: InteractionStyle.NORMAL,
-      });
-    });
-
-    it('resolves FIXED_MONTHS + NORMAL', () => {
-      expect(resolveReviewConfig('FIXED_MONTHS', 'NORMAL')).toEqual({
-        algorithm: SchedulingAlgorithm.FIXED_MONTHS,
-        interaction: InteractionStyle.NORMAL,
-      });
-    });
-
-    it('resolves FIXED_YEARS + NORMAL', () => {
-      expect(resolveReviewConfig('FIXED_YEARS', 'NORMAL')).toEqual({
-        algorithm: SchedulingAlgorithm.FIXED_YEARS,
+    it('resolves FIXED_TIME + NORMAL', () => {
+      expect(resolveReviewConfig('FIXED_TIME', 'NORMAL')).toEqual({
+        algorithm: SchedulingAlgorithm.FIXED_TIME,
         interaction: InteractionStyle.NORMAL,
       });
     });
@@ -95,6 +74,14 @@ describe('resolveReviewConfig', () => {
         algorithm: SchedulingAlgorithm.PROGRESSIVE,
         interaction: InteractionStyle.NORMAL,
       });
+    });
+
+    it('defaults legacy FIXED_DAYS to PROGRESSIVE (no backward compat)', () => {
+      expect(resolveReviewConfig('FIXED_DAYS', 'NORMAL')).toEqual(DEFAULT_REVIEW_CONFIG);
+    });
+
+    it('defaults legacy FIXED_WEEKS to PROGRESSIVE (no backward compat)', () => {
+      expect(resolveReviewConfig('FIXED_WEEKS', 'NORMAL')).toEqual(DEFAULT_REVIEW_CONFIG);
     });
   });
 });

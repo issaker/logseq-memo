@@ -168,7 +168,7 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
             <span>Show Review Mode Borders</span>
           </label>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
-            Show the green/orange dialog border that marks the current card&apos;s review mode.
+            Show the colored dialog border that marks the current card&apos;s algorithm (green=SM2, orange=Progressive, blue=Fixed Time).
           </p>
         </div>
 

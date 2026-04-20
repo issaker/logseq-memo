@@ -5,7 +5,7 @@ import styled from '@emotion/styled';
 import * as dateUtils from '~/utils/date';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { ALGORITHM_META, INTERACTION_META, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
+import { ALGORITHM_META, INTERACTION_META, SchedulingAlgorithm, InteractionStyle, getAlgorithmIntent } from '~/models/session';
 import { RenderMode } from '~/models/practice';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { colors } from '~/theme';
@@ -252,15 +252,14 @@ const ModeBadge = ({ algorithm, interaction }: { algorithm?: SchedulingAlgorithm
 
   const algoMeta = algorithm ? ALGORITHM_META[algorithm] : undefined;
   const interactionMeta = interaction ? INTERACTION_META[interaction] : undefined;
-
-  const groupIntent = algoMeta?.group === 'Spaced' ? 'success' : 'warning';
+  const groupIntent = getAlgorithmIntent(algorithm);
   const interactionLabel = interactionMeta?.label;
 
   return (
     <>
       {algoMeta && (
         <Blueprint.Tag intent={groupIntent} minimal>
-          {algoMeta.group}
+          {algoMeta.label}
         </Blueprint.Tag>
       )}
       {interactionLabel && interaction !== InteractionStyle.NORMAL && (

@@ -1,40 +1,26 @@
 import {
   SchedulingAlgorithm,
+  FixedTimeUnit,
   InteractionStyle,
-  isFixedAlgorithm,
-  isSpacedAlgorithm,
+  isFixedTimeAlgorithm,
   isGradingAlgorithm,
   isLBLReviewMode,
+  getAlgorithmIntent,
   ALGORITHM_META,
   INTERACTION_META,
 } from '~/models/session';
 
 describe('mode classification functions', () => {
-  it('isFixedAlgorithm returns true only for Fixed algorithms', () => {
-    expect(isFixedAlgorithm(SchedulingAlgorithm.PROGRESSIVE)).toBe(false);
-    expect(isFixedAlgorithm(SchedulingAlgorithm.FIXED_DAYS)).toBe(true);
-    expect(isFixedAlgorithm(SchedulingAlgorithm.FIXED_WEEKS)).toBe(true);
-    expect(isFixedAlgorithm(SchedulingAlgorithm.FIXED_MONTHS)).toBe(true);
-    expect(isFixedAlgorithm(SchedulingAlgorithm.FIXED_YEARS)).toBe(true);
-    expect(isFixedAlgorithm(SchedulingAlgorithm.SM2)).toBe(false);
-  });
-
-  it('isSpacedAlgorithm returns true for Spaced algorithms', () => {
-    expect(isSpacedAlgorithm(SchedulingAlgorithm.SM2)).toBe(true);
-    expect(isSpacedAlgorithm(SchedulingAlgorithm.PROGRESSIVE)).toBe(true);
-    expect(isSpacedAlgorithm(SchedulingAlgorithm.FIXED_DAYS)).toBe(false);
-    expect(isSpacedAlgorithm(SchedulingAlgorithm.FIXED_WEEKS)).toBe(false);
-    expect(isSpacedAlgorithm(SchedulingAlgorithm.FIXED_MONTHS)).toBe(false);
-    expect(isSpacedAlgorithm(SchedulingAlgorithm.FIXED_YEARS)).toBe(false);
+  it('isFixedTimeAlgorithm returns true only for FIXED_TIME', () => {
+    expect(isFixedTimeAlgorithm(SchedulingAlgorithm.PROGRESSIVE)).toBe(false);
+    expect(isFixedTimeAlgorithm(SchedulingAlgorithm.FIXED_TIME)).toBe(true);
+    expect(isFixedTimeAlgorithm(SchedulingAlgorithm.SM2)).toBe(false);
   });
 
   it('isGradingAlgorithm returns true only for SM2', () => {
     expect(isGradingAlgorithm(SchedulingAlgorithm.SM2)).toBe(true);
     expect(isGradingAlgorithm(SchedulingAlgorithm.PROGRESSIVE)).toBe(false);
-    expect(isGradingAlgorithm(SchedulingAlgorithm.FIXED_DAYS)).toBe(false);
-    expect(isGradingAlgorithm(SchedulingAlgorithm.FIXED_WEEKS)).toBe(false);
-    expect(isGradingAlgorithm(SchedulingAlgorithm.FIXED_MONTHS)).toBe(false);
-    expect(isGradingAlgorithm(SchedulingAlgorithm.FIXED_YEARS)).toBe(false);
+    expect(isGradingAlgorithm(SchedulingAlgorithm.FIXED_TIME)).toBe(false);
   });
 
   it('isLBLReviewMode returns true only for LBL interaction', () => {
@@ -43,10 +29,21 @@ describe('mode classification functions', () => {
   });
 
   it('all classification functions return false for undefined', () => {
-    expect(isFixedAlgorithm(undefined)).toBe(false);
-    expect(isSpacedAlgorithm(undefined)).toBe(false);
+    expect(isFixedTimeAlgorithm(undefined)).toBe(false);
     expect(isGradingAlgorithm(undefined)).toBe(false);
     expect(isLBLReviewMode(undefined)).toBe(false);
+  });
+});
+
+describe('getAlgorithmIntent', () => {
+  it('returns correct intent for each algorithm', () => {
+    expect(getAlgorithmIntent(SchedulingAlgorithm.SM2)).toBe('success');
+    expect(getAlgorithmIntent(SchedulingAlgorithm.PROGRESSIVE)).toBe('warning');
+    expect(getAlgorithmIntent(SchedulingAlgorithm.FIXED_TIME)).toBe('primary');
+  });
+
+  it('returns none for undefined', () => {
+    expect(getAlgorithmIntent(undefined)).toBe('none');
   });
 });
 
@@ -59,7 +56,7 @@ describe('ALGORITHM_META', () => {
   });
 
   it('every entry has a valid group', () => {
-    const validGroups: string[] = ['Spaced', 'Fixed'];
+    const validGroups: string[] = ['SM2', 'Progressive', 'FixedTime'];
     const entries = Object.values(ALGORITHM_META);
     for (const entry of entries) {
       expect(validGroups).toContain(entry.group);

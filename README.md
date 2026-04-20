@@ -46,7 +46,7 @@ This is a modified version of the original Memo plugin. Load it using the `{{[[r
 | Previous card | `←` | |
 | Breadcrumbs | `b` | |
 | Close memo | `esc` | |
-| Edit interval | `e` | Fixed algorithms only |
+| Edit interval | `e` | Fixed Time only |
 
 Command Palette: Type "Memo: Start Review Session" (`Cmd+P` / `Ctrl+P`)
 
@@ -65,7 +65,7 @@ Hide text for recall practice using braces: `{hide me}`. Masked with background 
 Set a daily review limit in settings. ~25% of reviewed cards are new; round-robin distribution across decks for fairness.
 
 ### Shuffle Cards
-Enable to randomize card order. Default: due cards sorted by urgency (most overdue → lowest eFactor → fewest repetitions). Fixed algorithm cards use default eFactor (2.5) for moderate queue priority.
+Enable to randomize card order. Default: due cards sorted by urgency (most overdue → lowest eFactor → fewest repetitions). Fixed Time cards use default eFactor (2.5) for moderate queue priority.
 
 ### Cram Mode
 After finishing due cards, continue reviewing all cards without affecting scheduling.
@@ -78,9 +78,9 @@ Show the block's page hierarchy for context. Toggle with `b` key. Preference per
 
 ### Mode Indicator Badge
 Color-coded badges in the header bar for instant visual identification:
-- **Algorithm badge**: Spaced (green) / Fixed (orange)
+- **Algorithm badge**: SM2 (green) / Progressive (orange) / Fixed Time (blue)
 - **Interaction badge**: LBL (when active)
-- Dialog border color matches the algorithm group (toggle via "Show Review Mode Borders")
+- Dialog border color matches the algorithm (toggle via "Show Review Mode Borders")
 
 ## Architecture
 
@@ -90,22 +90,24 @@ The review system uses a **two-dimensional orthogonal architecture**. Each card 
 
 | Dimension | Purpose | Values |
 |-----------|---------|--------|
-| **Scheduling Algorithm** | Interval calculation | `SM2`, `PROGRESSIVE`, `FIXED_DAYS/WEEKS/MONTHS/YEARS` |
+| **Scheduling Algorithm** | Interval calculation | `PROGRESSIVE`, `SM2`, `FIXED_TIME` |
 | **Interaction Style** | Card presentation | `NORMAL`, `LBL` |
 
 All definitions are in `src/models/session.ts`.
 
 #### Scheduling Algorithms
 
-| Algorithm | Group | Description |
-|-----------|-------|-------------|
-| `SM2` | Spaced | Modified SuperMemo 2 — adaptive intervals based on grading (Forgot/Hard/Good/Perfect) |
-| `PROGRESSIVE` | Fixed | Exponential curve: 2→6→12→24→48→96 days |
-| `FIXED_DAYS/WEEKS/MONTHS/YEARS` | Fixed | Fixed intervals, configurable per card via interval editor (`E` key) |
+| Algorithm | Description | Border Color |
+|-----------|-------------|-------------|
+| `PROGRESSIVE` | Exponential curve: 2→6→12→24→48→96 days (reading card) | Orange |
+| `SM2` | Modified SuperMemo 2 — adaptive intervals based on grading (Forgot/Hard/Good/Perfect) | Green |
+| `FIXED_TIME` | User-defined interval via number + time unit (days/weeks/months/years) | Blue |
 
 **SM2 details**: `interval × eFactor × (grade/5)`. Grade mapping: Forgot(0), Hard(2), Good(4), Perfect(5). Grade 0 → review again today; Grades 1-2 → review tomorrow. E-Factor minimum: 1.3.
 
-**Progressive**: Standalone exponential curve, independent of SM2. Only modifies `progressive_repetitions`, never pollutes SM2 fields.
+**Progressive**: Standalone exponential curve, independent of SM2. Only modifies `progressive_repetitions`, never pollutes SM2 fields. Default algorithm for new cards.
+
+**Fixed Time**: User manually sets the review interval (number + time unit). No algorithm state — just direct nextDueDate calculation from user input. Configurable per card via interval editor (`E` key).
 
 #### Interaction Styles
 
@@ -116,9 +118,9 @@ All definitions are in `src/models/session.ts`.
 
 **LBL behavior is determined by the algorithm**:
 - **LBL + SM2**: Show parent, reveal children one at a time, grade each with SM2 buttons. "Forgot" reinserts card into queue.
-- **LBL + Progressive/Fixed**: First unread child auto-revealed, click "Next" to advance with automatic reinsertion.
+- **LBL + Progressive/Fixed Time**: First unread child auto-revealed, click "Next" to advance with automatic reinsertion.
 
-> The `READ` (Incremental Read) interaction has been removed — its functionality is now covered by `LBL + Progressive/Fixed`.
+> The `READ` (Incremental Read) interaction has been removed — its functionality is now covered by `LBL + Progressive/Fixed Time`.
 
 #### Dynamic Switching
 Each card's `algorithm` and `interaction` are stored in the latest session block. Changes take effect immediately on card navigation via two independent selectors (bottom-right of grading area).
@@ -140,7 +142,9 @@ roam/memo (page)
 │   │   │   ├── sm2_repetitions:: 3
 │   │   │   ├── sm2_interval:: 6
 │   │   │   ├── progressive_repetitions:: 2
-│   │   │   └── progressive_interval:: 6
+│   │   │   ├── progressive_interval:: 6
+│   │   │   ├── fixed_multiplier:: 3
+│   │   │   └── fixed_unit:: days
 │   │   └── [[April 13th, 2026]] 🔴    ← Older session
 │   └── ...
 ├── cache (heading block)
@@ -153,6 +157,7 @@ roam/memo (page)
 - Each algorithm only modifies its OWN fields; other fields are inherited unchanged → switching algorithms never loses data
 - LBL child blocks have independent sessions (legacy `lbl_progress` has been migrated)
 - `progressive_interval` is the calculated interval (2→6→12→24→48→96 days) based on `progressive_repetitions`
+- `fixed_multiplier` + `fixed_unit` store the user's interval choice for Fixed Time cards
 
 ### Settings Architecture
 
@@ -171,14 +176,19 @@ Settings use a **single-source-of-truth** design:
 
 ## Key Design Decisions & Pitfalls
 
-### Why Algorithm × Interaction instead of 8 ReviewModes?
+### Why Algorithm × Interaction instead of N ReviewModes?
 The old `ReviewModes` enum encoded both scheduling and interaction in each value (e.g., `SPACED_INTERVAL_LBL` = SM2 + LBL). This was **not orthogonal** — adding one algorithm required N new enum values. The new two-dimensional design separates concerns completely; adding either dimension is independent.
+
+### Why merge four Fixed modes into Fixed Time?
+The previous design had four separate algorithms (`FIXED_DAYS`, `FIXED_WEEKS`, `FIXED_MONTHS`, `FIXED_YEARS`) that differed only in their time unit. This was redundant — the unit is just a user preference, not a fundamentally different algorithm. Merging them into `FIXED_TIME` with a `fixed_unit` dropdown simplifies the algorithm list from 6 to 3, reduces UI clutter, and gives users more flexibility to change the time unit on the fly.
 
 ### Why data migration instead of runtime backward compatibility?
 The old system read `reviewMode::` fields and decomposed them at runtime on every card load — a permanent compatibility tax. The new approach uses **one-time data migration** that converts `reviewMode::` to `algorithm::` + `interaction::` at the data level, simplifying the loading pipeline permanently.
 
+**No backward compatibility policy**: The plugin does **not** do runtime backward compatibility. `resolveReviewConfig` treats unrecognized algorithm values as invalid and falls back to the default (PROGRESSIVE). Old data MUST be migrated via the Data Migration panel. This is an intentional design decision — permanent backward compatibility creates technical debt that accumulates over time, making the codebase harder to maintain and more bug-prone. Data migration is the single path forward.
+
 ### Why merge READ into LBL?
-`READ` was functionally identical to `LBL + Progressive`. Since the algorithm already determines LBL behavior (SM2 → grading buttons, Progressive/Fixed → Next button), a separate READ type was redundant. Removing it reduces the combination space from 18 to 12 with zero semantic loss.
+`READ` was functionally identical to `LBL + Progressive`. Since the algorithm already determines LBL behavior (SM2 → grading buttons, Progressive/Fixed Time → Next button), a separate READ type was redundant. Removing it reduces the combination space with zero semantic loss.
 
 ### Why the `{owner}_{purpose}` field naming convention?
 Old names (`repetitions`, `interval`, `eFactor`) were ambiguous — they didn't indicate which algorithm owned them. New names (`sm2_repetitions`, `progressive_interval`) make field ownership explicit, reducing cross-algorithm pollution bugs.
@@ -196,7 +206,7 @@ After upgrading to the `SchedulingAlgorithm × InteractionStyle` architecture, r
 1. Open Memo overlay → gear icon → **Settings**
 2. Navigate to **Data Migration** → Click migration button
 
-**What it does**: `reviewMode::` → `algorithm::` + `interaction::`, `cardType::` → `reviewMode::`, meta block merge, `lineByLineReview:: Y` → LBL, `interaction:: READ` → `LBL`, field renaming to `{owner}_{purpose}` convention, duplicate/obsolete field cleanup.
+**What it does**: `reviewMode::` → `algorithm::` + `interaction::`, `cardType::` → `reviewMode::`, meta block merge, `lineByLineReview:: Y` → LBL, `interaction:: READ` → `LBL`, field renaming to `{owner}_{purpose}` convention, duplicate/obsolete field cleanup, `FIXED_DAYS/WEEKS/MONTHS/YEARS` → `FIXED_TIME`.
 
 **Safe to run multiple times** — already-migrated cards are skipped.
 
@@ -215,10 +225,10 @@ npm run test         # Run tests
 src/
 ├── extension.tsx          # Plugin entry point (onload/onunload)
 ├── app.tsx                # Root React component
-├── practice.ts            # SM2 + Progressive + Fixed Interval algorithms
+├── practice.ts            # SM2 + Progressive + Fixed Time algorithms
 ├── constants.ts           # Shared constants
 ├── models/
-│   ├── session.ts         # Session, CardMeta, SchedulingAlgorithm, InteractionStyle
+│   ├── session.ts         # Session, CardMeta, SchedulingAlgorithm, FixedTimeUnit, InteractionStyle
 │   └── practice.ts        # Today's review status model
 ├── queries/
 │   ├── data.ts            # Core data layer (session block parsing & merging)
@@ -241,7 +251,7 @@ src/
 ├── contexts/
 │   └── PracticeSessionContext.tsx
 ├── utils/                  # date, string, dom, async, mediaQueries, zIndexFix
-└── theme.ts               # Theme color definitions
+└── theme.ts               # Theme color definitions (SM2=green, Progressive=orange, FixedTime=blue)
 ```
 
 ## Privacy & Security

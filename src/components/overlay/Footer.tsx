@@ -7,7 +7,7 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { isFixedAlgorithm, isGradingAlgorithm, isLBLReviewMode, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META, Session } from '~/models/session';
+import { isFixedTimeAlgorithm, isGradingAlgorithm, isLBLReviewMode, SchedulingAlgorithm, FixedTimeUnit, InteractionStyle, ALGORITHM_META, INTERACTION_META, Session } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { usePracticeSession } from '~/contexts/PracticeSessionContext';
 import { getIntentColor, colors } from '~/theme';
@@ -41,7 +41,7 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { fixed_multiplier, baseCardData } = React.useContext(MainContext);
+  const { fixed_multiplier, fixed_unit, baseCardData } = React.useContext(MainContext);
   const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
@@ -161,7 +161,7 @@ const Footer = ({
         global: true,
         label: 'Edit Interval',
         onKeyDown: toggleIntervalEditorOpen,
-        disabled: !isFixedAlgorithm(algorithmFromSession),
+        disabled: !isFixedTimeAlgorithm(algorithmFromSession),
       },
     ],
     [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn]
@@ -191,14 +191,14 @@ const Footer = ({
         dateCreated: new Date(),
         algorithm: algorithmFromSession,
         interaction: interactionFromSession || InteractionStyle.NORMAL,
-        fixed_multiplier: fixed_multiplier,
+        ...(isFixedTimeAlgorithm(algorithmFromSession) && { fixed_multiplier, fixed_unit }),
         progressive_repetitions,
         progressive_interval,
       });
       estimates[grade] = practiceResultData;
     }
     return estimates;
-  }, [baseCardData, currentCardData, fixed_multiplier, algorithmFromSession]);
+  }, [baseCardData, currentCardData, fixed_multiplier, fixed_unit, algorithmFromSession, interactionFromSession]);
 
   return (
     <FooterWrapper
@@ -292,7 +292,7 @@ const GradingControlsWrapper = ({
 }) => {
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
-  const isFixedModeActive = isFixedAlgorithm(algorithm);
+  const isFixedModeActive = isFixedTimeAlgorithm(algorithm);
   const isAutoAdvanceMode = !isGradingAlgorithm(algorithm);
   const isLblNextActive = isLBLReviewMode(interaction) && isAutoAdvanceMode;
   return (
@@ -375,7 +375,7 @@ const GradingControlsWrapper = ({
 /**
  * LblNextControls
  *
- * Simplified grading UI for LBL + Fixed algorithm mode (LBL + Progressive/Fixed).
+ * Simplified grading UI for LBL + Non-grading algorithm (Progressive / FixedTime).
  * Displays a "Read" indicator with the next interval and a "Next" button
  * that advances to the next card. No grading buttons — the per-child
  * Progressive interval is calculated automatically in onLineByLineGrade.
@@ -430,11 +430,20 @@ const FixedIntervalEditor = () => {
   const {
     fixed_multiplier,
     setFixed_multiplier,
+    fixed_unit,
+    setFixed_unit,
   } = React.useContext(MainContext);
   const handleInputValueChange = (numericValue) => {
     if (isNaN(numericValue)) return;
     setFixed_multiplier(numericValue);
   };
+
+  const unitOptions = [
+    { value: FixedTimeUnit.DAYS, label: 'Days' },
+    { value: FixedTimeUnit.WEEKS, label: 'Weeks' },
+    { value: FixedTimeUnit.MONTHS, label: 'Months' },
+    { value: FixedTimeUnit.YEARS, label: 'Years' },
+  ];
 
   return (
     <div className="flex p-2 items-center w-80 justify-evenly">
@@ -451,11 +460,20 @@ const FixedIntervalEditor = () => {
           fill
         />
       </div>
+      <Blueprint.HTMLSelect
+        value={fixed_unit}
+        onChange={(e) => setFixed_unit(e.currentTarget.value as FixedTimeUnit)}
+        minimal
+      >
+        {unitOptions.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </Blueprint.HTMLSelect>
     </div>
   );
 };
 
-const IntervalString = ({ algorithm, fixed_multiplier, nextDueDateFromNow }) => {
+const IntervalString = ({ algorithm, fixed_multiplier, fixed_unit, nextDueDateFromNow }) => {
   if (algorithm === SchedulingAlgorithm.PROGRESSIVE) {
     const displayText = nextDueDateFromNow || 'Progressive';
     return (
@@ -465,47 +483,30 @@ const IntervalString = ({ algorithm, fixed_multiplier, nextDueDateFromNow }) => 
     );
   }
 
-  let singularString = '';
-  if (fixed_multiplier === 1) {
-    switch (algorithm) {
-      case SchedulingAlgorithm.FIXED_WEEKS:
-        singularString += 'Weekly';
-        break;
-      case SchedulingAlgorithm.FIXED_MONTHS:
-        singularString += 'Monthly';
-        break;
-      case SchedulingAlgorithm.FIXED_YEARS:
-        singularString += 'Yearly';
-        break;
-      default:
-        singularString += 'Daily';
-        break;
+  if (algorithm === SchedulingAlgorithm.FIXED_TIME) {
+    const unit = fixed_unit || FixedTimeUnit.DAYS;
+    const value = fixed_multiplier || 3;
+    const unitLabelMap = { [FixedTimeUnit.DAYS]: 'Days', [FixedTimeUnit.WEEKS]: 'Weeks', [FixedTimeUnit.MONTHS]: 'Months', [FixedTimeUnit.YEARS]: 'Years' };
+    const singularMap = { [FixedTimeUnit.DAYS]: 'Daily', [FixedTimeUnit.WEEKS]: 'Weekly', [FixedTimeUnit.MONTHS]: 'Monthly', [FixedTimeUnit.YEARS]: 'Yearly' };
+
+    if (value === 1) {
+      return (
+        <>
+          Review <span className="font-medium mr-3">{singularMap[unit]}</span>
+        </>
+      );
     }
+    return (
+      <>
+        Review{' '}
+        <span className="font-medium mr-3">
+          Every {value} {unitLabelMap[unit]}
+        </span>
+      </>
+    );
   }
 
-  const unitLabel = (() => {
-    switch (algorithm) {
-      case SchedulingAlgorithm.FIXED_WEEKS: return 'Weeks';
-      case SchedulingAlgorithm.FIXED_MONTHS: return 'Months';
-      case SchedulingAlgorithm.FIXED_YEARS: return 'Years';
-      default: return 'Days';
-    }
-  })();
-
-  return (
-    <>
-      Review{' '}
-      <span className="font-medium mr-3">
-        {singularString ? (
-          singularString
-        ) : (
-          <>
-            Every {fixed_multiplier} {unitLabel}
-          </>
-        )}
-      </span>
-    </>
-  );
+  return null;
 };
 
 const FixedIntervalModeControls = ({
@@ -521,7 +522,7 @@ const FixedIntervalModeControls = ({
   toggleIntervalEditorOpen: () => void;
   intervalEstimates: IntervalEstimates;
 }): JSX.Element => {
-  const { fixed_multiplier } = React.useContext(MainContext);
+  const { fixed_multiplier, fixed_unit } = React.useContext(MainContext);
   const { algorithm } = usePracticeSession();
   const isProgressive = algorithm === SchedulingAlgorithm.PROGRESSIVE;
   const onInteractionhandler = (nextState) => {
@@ -546,6 +547,7 @@ const FixedIntervalModeControls = ({
             <IntervalString
               algorithm={algorithm}
               fixed_multiplier={fixed_multiplier}
+              fixed_unit={fixed_unit}
               nextDueDateFromNow={intervalEstimates[0]?.nextDueDateFromNow}
             />
           </span>
@@ -565,6 +567,7 @@ const FixedIntervalModeControls = ({
               <IntervalString
                 algorithm={algorithm}
                 fixed_multiplier={fixed_multiplier}
+                fixed_unit={fixed_unit}
                 nextDueDateFromNow={intervalEstimates[0]?.nextDueDateFromNow}
               />
               <ButtonTags>E</ButtonTags>

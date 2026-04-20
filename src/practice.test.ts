@@ -1,5 +1,5 @@
 import * as practice from '~/practice';
-import { SchedulingAlgorithm, InteractionStyle } from '~/models/session';
+import { SchedulingAlgorithm, FixedTimeUnit, InteractionStyle } from '~/models/session';
 
 describe('supermemo: simulate practice', () => {
   let initInput;
@@ -273,6 +273,116 @@ describe('supermemo: simulate practice', () => {
       expect(sm2Result.progressive_repetitions).toBe(3);
       expect(sm2Result.progressive_interval).toBe(12);
       expect(sm2Result.sm2_repetitions).toBe(4);
+    });
+  });
+
+  describe('FixedTime mode', () => {
+    test('FixedTime with days unit calculates correct nextDueDate', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        algorithm: SchedulingAlgorithm.FIXED_TIME,
+        interaction: InteractionStyle.NORMAL,
+        fixed_multiplier: 3,
+        fixed_unit: FixedTimeUnit.DAYS,
+      });
+
+      expect(result.fixed_multiplier).toBe(3);
+      expect(result.fixed_unit).toBe(FixedTimeUnit.DAYS);
+      expect(result.nextDueDate).toEqual(new Date('2026-04-18T00:00:00.000Z'));
+    });
+
+    test('FixedTime with weeks unit calculates correct nextDueDate', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        algorithm: SchedulingAlgorithm.FIXED_TIME,
+        interaction: InteractionStyle.NORMAL,
+        fixed_multiplier: 2,
+        fixed_unit: FixedTimeUnit.WEEKS,
+      });
+
+      expect(result.fixed_multiplier).toBe(2);
+      expect(result.fixed_unit).toBe(FixedTimeUnit.WEEKS);
+      expect(result.nextDueDate).toEqual(new Date('2026-04-29T00:00:00.000Z'));
+    });
+
+    test('FixedTime with months unit calculates correct nextDueDate', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        algorithm: SchedulingAlgorithm.FIXED_TIME,
+        interaction: InteractionStyle.NORMAL,
+        fixed_multiplier: 1,
+        fixed_unit: FixedTimeUnit.MONTHS,
+      });
+
+      expect(result.fixed_multiplier).toBe(1);
+      expect(result.fixed_unit).toBe(FixedTimeUnit.MONTHS);
+      expect(result.nextDueDate).toEqual(new Date('2026-05-15T00:00:00.000Z'));
+    });
+
+    test('FixedTime with years unit calculates correct nextDueDate', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        algorithm: SchedulingAlgorithm.FIXED_TIME,
+        interaction: InteractionStyle.NORMAL,
+        fixed_multiplier: 1,
+        fixed_unit: FixedTimeUnit.YEARS,
+      });
+
+      expect(result.fixed_multiplier).toBe(1);
+      expect(result.fixed_unit).toBe(FixedTimeUnit.YEARS);
+      expect(result.nextDueDate).toEqual(new Date('2027-04-15T00:00:00.000Z'));
+    });
+
+    test('FixedTime defaults to 3 days when no multiplier or unit provided', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        algorithm: SchedulingAlgorithm.FIXED_TIME,
+        interaction: InteractionStyle.NORMAL,
+      });
+
+      expect(result.fixed_multiplier).toBe(3);
+      expect(result.fixed_unit).toBe(FixedTimeUnit.DAYS);
+      expect(result.nextDueDate).toEqual(new Date('2026-04-18T00:00:00.000Z'));
+    });
+
+    test('FixedTime preserves SM2 and Progressive fields', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        algorithm: SchedulingAlgorithm.FIXED_TIME,
+        interaction: InteractionStyle.NORMAL,
+        fixed_multiplier: 5,
+        fixed_unit: FixedTimeUnit.DAYS,
+        sm2_repetitions: 3,
+        sm2_eFactor: 2.26,
+        sm2_interval: 11,
+        sm2_grade: 4,
+        progressive_repetitions: 2,
+        progressive_interval: 12,
+      });
+
+      expect(result.sm2_repetitions).toBe(3);
+      expect(result.sm2_eFactor).toBe(2.26);
+      expect(result.sm2_interval).toBe(11);
+      expect(result.sm2_grade).toBe(4);
+      expect(result.progressive_repetitions).toBe(2);
+      expect(result.progressive_interval).toBe(12);
+    });
+
+    test('FixedTime does not write SM2/Progressive fields when they are undefined', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        algorithm: SchedulingAlgorithm.FIXED_TIME,
+        interaction: InteractionStyle.NORMAL,
+        fixed_multiplier: 3,
+        fixed_unit: FixedTimeUnit.DAYS,
+      });
+
+      expect(result.sm2_repetitions).toBeUndefined();
+      expect(result.sm2_eFactor).toBeUndefined();
+      expect(result.sm2_interval).toBeUndefined();
+      expect(result.sm2_grade).toBeUndefined();
+      expect(result.progressive_repetitions).toBeUndefined();
+      expect(result.progressive_interval).toBeUndefined();
     });
   });
 });

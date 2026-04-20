@@ -8,16 +8,28 @@
  *   Field naming convention: {owner}_{purpose}
  *   - sm2_*:      SM2 algorithm fields
  *   - progressive_*: Progressive algorithm fields
- *   - fixed_*:    Fixed interval algorithm fields
+ *   - fixed_*:    FixedTime algorithm fields (user input, not algorithm state)
  *   - (no prefix): Universal/config fields
  *
  *   Session block fields:
- *   - algorithm:          Scheduling algorithm (SM2, PROGRESSIVE, FIXED_DAYS, etc.)
+ *   - algorithm:          Scheduling algorithm (PROGRESSIVE, SM2, FIXED_TIME)
  *   - interaction:        Interaction style (NORMAL, LBL)
  *   - nextDueDate:        Next due date for the card.
  *   - sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor: SM2-specific parameters.
  *   - progressive_repetitions, progressive_interval: Progressive-specific parameters.
- *   - fixed_multiplier:   Fixed interval user-configured multiplier.
+ *   - fixed_multiplier:   FixedTime user-configured interval value.
+ *   - fixed_unit:         FixedTime user-configured time unit (days/weeks/months/years).
+ *   - baseSessionData:   Previous-day session snapshot for same-day Forgot re-review scenarios.
+ *
+ *   Three algorithms:
+ *   - SM2:        Memory card — adaptive intervals based on grading (green border)
+ *   - Progressive: Reading card — exponential curve 2→6→12→24→48→96 days (orange border)
+ *   - FixedTime:  Custom time card — user-defined interval via number + unit (blue border)
+ *
+ *   No backward compatibility policy:
+ *   插件不做运行时向后兼容。旧数据必须通过数据迁移面板一次性迁移。
+ *   resolveReviewConfig 遇到非法算法值直接回退默认（PROGRESSIVE），不做旧名映射。
+ *   这是有意的设计决策，避免长期技术债务。
  *
  *   LBL architecture:
  *   Child blocks in LBL mode have their own independent Session entries
@@ -40,6 +52,7 @@ export type Session = {
   progressive_repetitions?: number;
   progressive_interval?: number;
   fixed_multiplier?: number;
+  fixed_unit?: FixedTimeUnit;
   baseSessionData?: Session;
 } & SessionCommon;
 
@@ -64,19 +77,18 @@ export interface CompleteRecords {
 }
 
 export enum SchedulingAlgorithm {
-  SM2 = 'SM2',
   PROGRESSIVE = 'PROGRESSIVE',
-  FIXED_DAYS = 'FIXED_DAYS',
-  FIXED_WEEKS = 'FIXED_WEEKS',
-  FIXED_MONTHS = 'FIXED_MONTHS',
-  FIXED_YEARS = 'FIXED_YEARS',
+  SM2 = 'SM2',
+  FIXED_TIME = 'FIXED_TIME',
 }
 
-/**
- * 交互模式枚举。
- * 仅 NORMAL 和 LBL 两种：LBL 的具体行为由算法决定（SM2→打分，Fixed→Next 翻页）。
- * 已移除 READ（Incremental Read），因为 READ 本质上就是 LBL + Progressive，功能重复。
- */
+export enum FixedTimeUnit {
+  DAYS = 'days',
+  WEEKS = 'weeks',
+  MONTHS = 'months',
+  YEARS = 'years',
+}
+
 export enum InteractionStyle {
   NORMAL = 'NORMAL',
   LBL = 'LBL',
@@ -92,7 +104,7 @@ export const DEFAULT_REVIEW_CONFIG: ReviewConfig = {
   interaction: InteractionStyle.NORMAL,
 };
 
-export type AlgorithmGroup = 'Spaced' | 'Fixed';
+export type AlgorithmGroup = 'SM2' | 'Progressive' | 'FixedTime';
 
 export type AlgorithmMeta = {
   group: AlgorithmGroup;
@@ -105,12 +117,9 @@ export type InteractionMeta = {
 };
 
 export const ALGORITHM_META: Record<SchedulingAlgorithm, AlgorithmMeta> = {
-  [SchedulingAlgorithm.SM2]: { group: 'Spaced', label: 'SM2' },
-  [SchedulingAlgorithm.PROGRESSIVE]: { group: 'Spaced', label: 'Progressive' },
-  [SchedulingAlgorithm.FIXED_DAYS]: { group: 'Fixed', label: 'Fixed Days' },
-  [SchedulingAlgorithm.FIXED_WEEKS]: { group: 'Fixed', label: 'Fixed Weeks' },
-  [SchedulingAlgorithm.FIXED_MONTHS]: { group: 'Fixed', label: 'Fixed Months' },
-  [SchedulingAlgorithm.FIXED_YEARS]: { group: 'Fixed', label: 'Fixed Years' },
+  [SchedulingAlgorithm.PROGRESSIVE]: { group: 'Progressive', label: 'Progressive' },
+  [SchedulingAlgorithm.SM2]: { group: 'SM2', label: 'SM2' },
+  [SchedulingAlgorithm.FIXED_TIME]: { group: 'FixedTime', label: 'Fixed Time' },
 };
 
 export const INTERACTION_META: Record<InteractionStyle, InteractionMeta> = {
@@ -118,14 +127,8 @@ export const INTERACTION_META: Record<InteractionStyle, InteractionMeta> = {
   [InteractionStyle.LBL]: { label: 'Line by Line', icon: 'list' },
 };
 
-export const isFixedAlgorithm = (algorithm: SchedulingAlgorithm | undefined): boolean => {
-  if (!algorithm) return false;
-  return ALGORITHM_META[algorithm]?.group === 'Fixed';
-};
-
-export const isSpacedAlgorithm = (algorithm: SchedulingAlgorithm | undefined): boolean => {
-  if (!algorithm) return false;
-  return ALGORITHM_META[algorithm]?.group === 'Spaced';
+export const isFixedTimeAlgorithm = (algorithm: SchedulingAlgorithm | undefined): boolean => {
+  return algorithm === SchedulingAlgorithm.FIXED_TIME;
 };
 
 export const isLBLReviewMode = (interaction?: InteractionStyle): boolean =>
@@ -135,15 +138,18 @@ export const isGradingAlgorithm = (algorithm: SchedulingAlgorithm | undefined): 
   return algorithm === SchedulingAlgorithm.SM2;
 };
 
-export const getDefaultIntervalMultiplier = (algorithm: SchedulingAlgorithm | undefined): number => {
-  if (algorithm === SchedulingAlgorithm.PROGRESSIVE) return 2;
-  if (isFixedAlgorithm(algorithm)) return 3;
-  return 3;
+export const getAlgorithmIntent = (algorithm: SchedulingAlgorithm | undefined): 'success' | 'warning' | 'primary' | 'none' => {
+  switch (algorithm) {
+    case SchedulingAlgorithm.SM2: return 'success';
+    case SchedulingAlgorithm.PROGRESSIVE: return 'warning';
+    case SchedulingAlgorithm.FIXED_TIME: return 'primary';
+    default: return 'none';
+  }
 };
 
 /**
- * 解析算法和交互配置。无效值回退到默认（SM2 + NORMAL）。
- * 不再做 READ→LBL 的运行时兼容映射，由 Data Migration 负责数据转换。
+ * 解析算法和交互配置。无效值回退到默认（PROGRESSIVE + NORMAL）。
+ * 不做旧名映射——旧数据必须通过数据迁移面板一次性迁移。
  */
 export const resolveReviewConfig = (
   rawAlgorithm?: string,

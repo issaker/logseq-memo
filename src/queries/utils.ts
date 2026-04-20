@@ -14,6 +14,7 @@ import {
   NewSession,
   SchedulingAlgorithm,
   InteractionStyle,
+  FixedTimeUnit,
 } from '~/models/session';
 
 export const parentChainInfoQuery = `[
@@ -300,6 +301,7 @@ export const generateNewSession = ({
   return {
     ...baseSession,
     fixed_multiplier: 3,
+    fixed_unit: FixedTimeUnit.DAYS,
     isNew,
   };
 };

@@ -80,6 +80,8 @@ export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) 
 
       if (isCompletedToday) {
         if (cardData.interaction === 'LBL') {
+          // LBL 卡片今天完成但 nextDueDate 仍 <= now 时不计入 completed，
+          // 因为子 block 可能未全部完成（nextDueDate 由最早到期子 block 决定）
           const now = new Date();
           if (cardData.nextDueDate && cardData.nextDueDate <= now) return;
         }

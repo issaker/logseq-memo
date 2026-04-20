@@ -4,7 +4,7 @@
  * Provides card data for the currently displayed card in the practice overlay.
  *
  * Data source:
- *   sessions prop — Complete session history from the initial data fetch.
+ *   sessions prop — Latest effective session (wrapped in single-element array for API compatibility).
  *   algorithm, interaction, and other meta fields are already merged into each
  *   Session record during the initial data load (see data.ts → mapPluginPageData),
  *   so no separate polling or meta query is needed.

@@ -2,7 +2,7 @@
 
 ## Design Principle
 
-**Simplicity** — All colors inherit from Roam body automatically via CSS. Only functional colors (intent, cloze masks, mode indicators) are explicitly defined in `theme.ts`.
+**Simplicity** — All colors inherit from Roam body automatically via CSS. Only functional colors (intent, cloze masks, algorithm indicators) are explicitly defined in `theme.ts`.
 
 ## How It Works
 
@@ -33,9 +33,10 @@ export const colors = {
   // Border colors
   borderSubtle: 'rgba(128, 128, 128, 0.15)',
 
-  // Card mode indicator colors (aligned with intent colors for visual consistency)
-  modeSpaced: 'var(--roam-success-color, #56d364)', // Spaced = green = same as "New" tag
-  modeFixed: 'var(--roam-warning-color, #d29922)', // Fixed = orange = same as "Past Due" tag
+  // Algorithm indicator colors (3 algorithms × visual identity)
+  modeSM2: 'var(--roam-success-color, #56d364)',         // SM2 = green = memory card
+  modeProgressive: 'var(--roam-warning-color, #d29922)', // Progressive = orange = reading card
+  modeFixedTime: 'var(--roam-primary-color, #8cb4ff)',   // FixedTime = blue = custom time card
 
   // Line-by-line review accents
   lineByLineCurrentBorder: 'var(--roam-success-color, #56d364)',
@@ -61,9 +62,9 @@ Dialog container
 Header / Footer / CardBlock
     ↓ uses intent colors
 Buttons (primary/success/warning/danger)
-    ↓ uses mode colors
-ModeBadge (success=Spaced / warning=Fixed)
-Dialog border (modeSpaced / modeFixed)
+    ↓ uses algorithm colors
+ModeBadge (success=SM2 / warning=Progressive / primary=FixedTime)
+Dialog border (modeSM2 / modeProgressive / modeFixedTime)
 ```
 
 ## File Structure
@@ -73,7 +74,7 @@ src/
 ├── theme.ts              # Single source of color definitions
 ├── app.tsx               # Main app (no theme-related logic)
 └── components/overlay/
-    ├── PracticeOverlay.tsx  # Dialog inherits background + dynamic border color (based on algorithm group)
+    ├── PracticeOverlay.tsx  # Dialog inherits background + dynamic border color (based on algorithm)
     ├── Footer.tsx           # Buttons use intent colors
     └── CardBlock.tsx        # Cloze mask uses fixed color
 ```
@@ -102,9 +103,9 @@ A: This is a fixed light gray per design spec — it doesn't change with theme t
 
 A: Required to override Blueprint.js defaults for fullscreen behavior.
 
-### Q: Why are there only two mode colors (Spaced/Fixed)?
+### Q: Why are there three algorithm colors?
 
-A: The READ interaction style has been removed from the system (its functionality is now covered by LBL + Progressive/Fixed). LBL + Fixed cards use `modeFixed` (orange) instead of a separate color. This keeps the visual system simple: green = SM2, orange = everything else.
+A: Each algorithm has a distinct visual identity: SM2 (green = memory/retention), Progressive (orange = reading/progress), FixedTime (blue = custom/scheduled). The `getAlgorithmColor()` function maps each `SchedulingAlgorithm` enum value to its corresponding color from `theme.ts`.
 
 ## Maintenance Guide
 

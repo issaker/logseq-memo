@@ -1,7 +1,8 @@
 /**
  * Data Migration Panel
  *
- * Migrates legacy data structures to the unified session-block architecture:
+ * Migrates legacy data structures to the unified session-block architecture.
+ * No backward compatibility — old data MUST be migrated via this panel.
  *
  * Phase 1: cardType → reviewMode rename + write reviewMode to session + duplicate cleanup + meta block merge into session
  * Phase 2: Delete session-level reviewMode field blocks
@@ -9,6 +10,7 @@
  * Phase 4: Deduplicate algorithm/interaction fields + rename old field names to {owner}_{purpose} convention + convert READ → LBL
  * Phase 5: Compact latest session snapshots (fill missing fields from merged history)
  * Phase 6: Migrate legacy lbl_progress / lineByLineProgress to independent child block sessions
+ * Phase 7: Convert FIXED_DAYS/WEEKS/MONTHS/YEARS → FIXED_TIME + add fixed_unit field
  */
 import * as React from 'react';
 import { Alert } from '@blueprintjs/core';
@@ -27,10 +29,10 @@ const LEGACY_MODE_TO_CONFIG: Record<string, { algorithm: SchedulingAlgorithm; in
   SPACED_INTERVAL_LBL: { algorithm: SchedulingAlgorithm.SM2, interaction: InteractionStyle.LBL },
   FIXED_PROGRESSIVE: { algorithm: SchedulingAlgorithm.PROGRESSIVE, interaction: InteractionStyle.NORMAL },
   FIXED_PROGRESSIVE_LBL: { algorithm: SchedulingAlgorithm.PROGRESSIVE, interaction: InteractionStyle.LBL },
-  FIXED_DAYS: { algorithm: SchedulingAlgorithm.FIXED_DAYS, interaction: InteractionStyle.NORMAL },
-  FIXED_WEEKS: { algorithm: SchedulingAlgorithm.FIXED_WEEKS, interaction: InteractionStyle.NORMAL },
-  FIXED_MONTHS: { algorithm: SchedulingAlgorithm.FIXED_MONTHS, interaction: InteractionStyle.NORMAL },
-  FIXED_YEARS: { algorithm: SchedulingAlgorithm.FIXED_YEARS, interaction: InteractionStyle.NORMAL },
+  FIXED_DAYS: { algorithm: SchedulingAlgorithm.FIXED_TIME, interaction: InteractionStyle.NORMAL },
+  FIXED_WEEKS: { algorithm: SchedulingAlgorithm.FIXED_TIME, interaction: InteractionStyle.NORMAL },
+  FIXED_MONTHS: { algorithm: SchedulingAlgorithm.FIXED_TIME, interaction: InteractionStyle.NORMAL },
+  FIXED_YEARS: { algorithm: SchedulingAlgorithm.FIXED_TIME, interaction: InteractionStyle.NORMAL },
 };
 import { updateReviewConfig, deduplicateSessionFields } from '~/queries';
 import { getPluginPageData, SESSION_SNAPSHOT_KEYS } from '~/queries/data';
@@ -879,11 +881,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
             if (value === undefined || value === null) continue;
 
             if (key === 'nextDueDate' && value instanceof Date) {
-              const dateStr = value.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              }).replace(/(\d+)(st|nd|rd|th)/, '$1$2');
+              const dateStr = window.roamAlphaAPI.util.dateToPageTitle(value);
               missingFields.push({ key, value: `[[${dateStr}]]` });
             } else {
               missingFields.push({ key, value: String(value) });
@@ -1031,11 +1029,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                   }
 
                   const now = new Date();
-                  const dateStr = now.toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  }).replace(/(\d+)(st|nd|rd|th)/, '$1$2');
+                  const dateStr = window.roamAlphaAPI.util.dateToPageTitle(now);
 
                   const algorithm = sessionData.algorithm || 'SM2';
 
@@ -1076,17 +1070,16 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
                   if (childData.nextDueDate) {
                     const dueDate = new Date(childData.nextDueDate);
-                    const dueDateStr = dueDate.toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    }).replace(/(\d+)(st|nd|rd|th)/, '$1$2');
+                    const dueDateStr = window.roamAlphaAPI.util.dateToPageTitle(dueDate);
                     fieldsToCreate.push(`nextDueDate:: [[${dueDateStr}]]`);
                   }
                   if (childData.sm2_interval !== undefined) fieldsToCreate.push(`sm2_interval:: ${childData.sm2_interval}`);
                   if (childData.sm2_repetitions !== undefined) fieldsToCreate.push(`sm2_repetitions:: ${childData.sm2_repetitions}`);
                   if (childData.sm2_eFactor !== undefined) fieldsToCreate.push(`sm2_eFactor:: ${childData.sm2_eFactor}`);
+                  if (childData.sm2_grade !== undefined) fieldsToCreate.push(`sm2_grade:: ${childData.sm2_grade}`);
+                  if (childData.grade !== undefined) fieldsToCreate.push(`sm2_grade:: ${childData.grade}`);
                   if (childData.progressive_repetitions !== undefined) fieldsToCreate.push(`progressive_repetitions:: ${childData.progressive_repetitions}`);
+                  if (childData.progressive_interval !== undefined) fieldsToCreate.push(`progressive_interval:: ${childData.progressive_interval}`);
 
                   for (const fieldString of fieldsToCreate) {
                     await window.roamAlphaAPI.createBlock({
@@ -1135,6 +1128,124 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         errors: phase6Errors,
       });
 
+      setProgress({
+        total,
+        migrated,
+        skipped,
+        phase: 'Phase 7: Converting FIXED_DAYS/WEEKS/MONTHS/YEARS → FIXED_TIME',
+      });
+
+      let phase7Converted = 0;
+      let phase7Skipped = 0;
+      let phase7Errors = 0;
+
+      try {
+        const LEGACY_FIXED_MAP: Record<string, string> = {
+          FIXED_DAYS: 'days',
+          FIXED_WEEKS: 'weeks',
+          FIXED_MONTHS: 'months',
+          FIXED_YEARS: 'years',
+        };
+
+        const p7Query = `[
+          :find (pull ?pluginPageChildren [
+            :block/string
+            :block/children
+            :block/order
+            :block/uid
+            {:block/children ...}])
+          :in $ ?pageTitle ?dataBlockName
+          :where
+          [?page :node/title ?pageTitle]
+          [?page :block/children ?pluginPageChildren]
+          [?pluginPageChildren :block/string ?dataBlockName]
+        ]`;
+
+        const p7QueryResults = await window.roamAlphaAPI.q(p7Query, dataPageTitle, 'data');
+        const p7DataChildren = p7QueryResults.map((arr) => arr[0])[0]?.children || [];
+
+        for (const cardChild of p7DataChildren) {
+          if (!cardChild?.string) continue;
+          const cardUid = getStringBetween(cardChild.string, '((', '))');
+          if (!cardUid) continue;
+
+          if (!cardChild.children) continue;
+
+          for (const sessionBlock of cardChild.children) {
+            if (!sessionBlock?.children) continue;
+
+            let hasLegacyAlgorithm = false;
+            let legacyAlgorithmValue = '';
+
+            for (const fieldBlock of sessionBlock.children) {
+              const [key, value] = parseConfigString(fieldBlock.string || '');
+              if (key === 'algorithm' && value && LEGACY_FIXED_MAP[value]) {
+                hasLegacyAlgorithm = true;
+                legacyAlgorithmValue = value;
+                try {
+                  await window.roamAlphaAPI.updateBlock({
+                    block: { uid: fieldBlock.uid, string: 'algorithm:: FIXED_TIME' },
+                  });
+                } catch (err) {
+                  console.error(`[Memo] Phase 7 algorithm update error:`, err);
+                  phase7Errors++;
+                }
+                break;
+              }
+            }
+
+            if (hasLegacyAlgorithm) {
+              try {
+                await window.roamAlphaAPI.createBlock({
+                  location: { 'parent-uid': sessionBlock.uid, order: -1 },
+                  block: { string: `fixed_unit:: ${LEGACY_FIXED_MAP[legacyAlgorithmValue]}`, open: false },
+                });
+                phase7Converted++;
+              } catch (err) {
+                console.error(`[Memo] Phase 7 fixed_unit create error:`, err);
+                phase7Errors++;
+              }
+
+              let hasFixedMultiplier = false;
+              for (const fieldBlock of sessionBlock.children) {
+                const [key] = parseConfigString(fieldBlock.string || '');
+                if (key === 'fixed_multiplier' || key === 'intervalMultiplier') {
+                  hasFixedMultiplier = true;
+                  break;
+                }
+              }
+              if (!hasFixedMultiplier) {
+                await window.roamAlphaAPI.createBlock({
+                  location: { 'parent-uid': sessionBlock.uid, order: -1 },
+                  block: { string: 'fixed_multiplier:: 3', open: false },
+                });
+              }
+
+              if (phase7Converted % 5 === 0) {
+                setProgress((prev) => ({
+                  ...prev,
+                  phase: `Phase 7: Converted ${phase7Converted} FIXED_* cards...`,
+                }));
+                await sleep(BATCH_DELAY_MS);
+              } else {
+                await sleep(CARD_DELAY_MS);
+              }
+            } else {
+              phase7Skipped++;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Memo] Phase 7 error:', err);
+        errMsgs.push(`Phase 7: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      debugLog(`[Memo] Phase 7 summary:`, {
+        converted: phase7Converted,
+        skipped: phase7Skipped,
+        errors: phase7Errors,
+      });
+
       setProgress({ total, migrated, skipped, phase: 'Done' });
 
       const totalErrors = errors + phase3Errors + phase6Errors;
@@ -1166,9 +1277,10 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
       >
         <p>
           This migration will convert <strong>reviewMode</strong> fields to the new{' '}
-          <strong>algorithm</strong> + <strong>interaction</strong> format, rename legacy field names,
-          delete redundant fields, and migrate legacy <strong>lbl_progress</strong> data to independent
-          child block sessions.
+<strong>algorithm</strong> + <strong>interaction</strong> format, rename legacy field names,
+delete redundant fields, migrate legacy <strong>lbl_progress</strong> data to independent
+child block sessions, and convert <strong>FIXED_DAYS/WEEKS/MONTHS/YEARS</strong> to{' '}
+<strong>FIXED_TIME</strong> with the appropriate <strong>fixed_unit</strong> field.
         </p>
         {scanResult && (
           <p>

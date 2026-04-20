@@ -6,7 +6,7 @@
  * Architecture:
  * - Receives practice data, settings, and callbacks as props from App
  * - useCurrentCardData derives card state from the session history (no polling)
- * - MainContext provides shared state (algorithm, interaction, fixed_multiplier editor state, etc.) to child components
+ * - MainContext provides shared state (algorithm, interaction, fixed_multiplier/fixed_unit editor state, etc.) to child components
  * - Footer handles grading buttons and keyboard shortcuts
  * - CardBlock renders the actual Roam block content
  *
@@ -34,13 +34,13 @@ import SettingsDialog from '~/components/overlay/SettingsDialog';
 import {
   Session,
   NewSession,
-  isFixedAlgorithm,
+  isFixedTimeAlgorithm,
   isGradingAlgorithm,
   isLBLReviewMode,
   SchedulingAlgorithm,
+  FixedTimeUnit,
   InteractionStyle,
   ALGORITHM_META,
-  getDefaultIntervalMultiplier,
 } from '~/models/session';
 import useLineByLineReview, { shouldReinsertLblCard } from '~/hooks/useLineByLineReview';
 export { shouldReinsertLblCard };
@@ -50,12 +50,14 @@ import { generateNewSession, updateReviewConfig, getChildSessionData } from '~/q
 import { generatePracticeData } from '~/practice';
 import { CompletionStatus, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
-import { colors } from '~/theme';
+import { colors, getAlgorithmColor } from '~/theme';
 import { usePracticeSession, PracticeSessionContext } from '~/contexts/PracticeSessionContext';
 
 interface MainContextProps {
   fixed_multiplier: number;
   setFixed_multiplier: (multiplier: number) => void;
+  fixed_unit: FixedTimeUnit;
+  setFixed_unit: (unit: FixedTimeUnit) => void;
   onPracticeClick: (props: handlePracticeProps) => void;
   currentIndex: number;
   renderMode: RenderMode;
@@ -144,7 +146,12 @@ const PracticeOverlay = ({
   const hasCards = totalCardsCount > 0;
 
   const [fixed_multiplier, setFixed_multiplier] = React.useState<number>(
-    currentCardData?.fixed_multiplier || currentCardData?.progressive_interval || getDefaultIntervalMultiplier(algorithm)
+    isFixedTimeAlgorithm(algorithm)
+      ? (currentCardData?.fixed_multiplier || 3)
+      : 3
+  );
+  const [fixed_unit, setFixed_unit] = React.useState<FixedTimeUnit>(
+    currentCardData?.fixed_unit || FixedTimeUnit.DAYS
   );
 
   const isDone = todaySelectedTag?.status === CompletionStatus.Finished || !currentCardData;
@@ -181,12 +188,12 @@ const PracticeOverlay = ({
 
     const algo = latestSession.algorithm as SchedulingAlgorithm | undefined;
 
-    if (algo === SchedulingAlgorithm.PROGRESSIVE) {
-      setFixed_multiplier(latestSession.progressive_interval || getDefaultIntervalMultiplier(algo));
-    } else if (isFixedAlgorithm(algo)) {
-      setFixed_multiplier(latestSession.fixed_multiplier || getDefaultIntervalMultiplier(algo));
+    if (isFixedTimeAlgorithm(algo)) {
+      setFixed_multiplier(latestSession.fixed_multiplier || 3);
+      setFixed_unit((latestSession as any).fixed_unit || FixedTimeUnit.DAYS);
     } else {
-      setFixed_multiplier(getDefaultIntervalMultiplier(algo));
+      setFixed_multiplier(3);
+      setFixed_unit(FixedTimeUnit.DAYS);
     }
   }, [latestSession, currentCardRefUid]);
 
@@ -252,7 +259,6 @@ const PracticeOverlay = ({
     currentCardRefUid,
     childUidsList,
     isLBLReviewMode: isLineByLineActive,
-    isLBLReview,
     dataPageTitle,
     lblNextReinsertOffset,
     forgotReinsertOffset,
@@ -326,15 +332,12 @@ const PracticeOverlay = ({
         return;
       }
 
-      const isForgotReReview = currentCardData?.sm2_grade === 0;
-      const baseData = (currentCardRefUid && baseSessionDataMap.current[currentCardRefUid] && !isForgotReReview)
-        ? { ...generateNewSession(), ...baseSessionDataMap.current[currentCardRefUid] }
-        : (currentCardRefUid ? practiceData[currentCardRefUid] : currentCardData) || currentCardData;
+      const baseData = baseCardData || currentCardData;
 
       const practiceProps = {
         ...baseData,
         ...gradeData,
-        fixed_multiplier: fixed_multiplier,
+        ...(isFixedTimeAlgorithm(algorithm) && { fixed_multiplier, fixed_unit }),
         algorithm,
         interaction,
       };
@@ -387,9 +390,11 @@ const PracticeOverlay = ({
       isDone,
       practiceData,
       currentCardData,
+      baseCardData,
       algorithm,
       interaction,
       fixed_multiplier,
+      fixed_unit,
       currentCardRefUid,
       forgotReinsertOffset,
       isCramming,
@@ -590,6 +595,8 @@ const PracticeOverlay = ({
       value={{
         fixed_multiplier,
         setFixed_multiplier,
+        fixed_unit,
+        setFixed_unit,
         onPracticeClick,
         currentIndex,
         renderMode,
@@ -722,20 +729,11 @@ const Dialog = styled(Blueprint.Dialog)<{
   width: 90vw;
 
   border: 2px solid
-    ${({ $algorithm }) =>
-      $algorithm && ALGORITHM_META[$algorithm]?.group === 'Spaced'
-        ? colors.modeSpaced
-        : $algorithm && ALGORITHM_META[$algorithm]?.group === 'Fixed'
-        ? colors.modeFixed
-        : colors.borderSubtle};
+    ${({ $algorithm }) => getAlgorithmColor($algorithm)};
   border-color: ${({ $showModeBorders, $algorithm }) =>
     $showModeBorders === false
       ? colors.borderSubtle
-      : $algorithm && ALGORITHM_META[$algorithm]?.group === 'Spaced'
-      ? colors.modeSpaced
-      : $algorithm && ALGORITHM_META[$algorithm]?.group === 'Fixed'
-      ? colors.modeFixed
-      : colors.borderSubtle};
+      : getAlgorithmColor($algorithm)};
 
   ${mediaQueries.lg} {
     width: 80vw;

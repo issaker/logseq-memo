@@ -2,13 +2,10 @@ import { savePracticeData } from '~/queries/save';
 import * as dateUtils from '~/utils/date';
 import {
   SchedulingAlgorithm,
+  FixedTimeUnit,
   Session,
 } from '~/models/session';
 
-/**
- * SM2 算法实现。
- * 字段命名遵循 {owner}_{purpose} 规范：sm2_interval, sm2_repetitions, sm2_eFactor, sm2_grade。
- */
 export const supermemo = (
   item: { sm2_interval: number; sm2_repetitions: number; sm2_eFactor: number },
   sm2_grade: number
@@ -43,9 +40,6 @@ export const supermemo = (
   return { sm2_interval: nextInterval, sm2_repetitions: nextRepetition, sm2_eFactor: nextEfactor };
 };
 
-/**
- * Progressive 算法间隔曲线：2 → 6 → 12 → 24 → 48 → 96 天
- */
 export const progressiveInterval = (progressive_repetitions: number): number => {
   if (progressive_repetitions <= 0) return 2;
   if (progressive_repetitions === 1) return 6;
@@ -55,23 +49,20 @@ export const progressiveInterval = (progressive_repetitions: number): number => 
 type PracticeDataResult = Session & { nextDueDateFromNow?: string };
 
 /**
- * 核心调度函数：根据算法和交互模式计算下一次复习数据。
+ * 核心调度函数：根据算法计算下一次复习数据。
  *
- * Mode Independence Principle（模式独立原则）：
- * 每个算法只操作自己的字段，其他算法的字段原样传递，确保切换算法不丢失数据。
- * 这确保了用户在不同算法间切换时，历史数据不会丢失。
- * 例如：从 Progressive 切换到 Fixed 后再切回 Progressive，
- * progressive_repetitions 仍然保留，间隔曲线能从正确位置继续。
+ * 字段归属与透传原则：
+ * 每个算法输出自己的核心字段 + 通用字段（algorithm, interaction, nextDueDate），
+ * 同时透传其他算法的已有字段，防止 savePracticeData 重写 session block 时丢失数据。
+ * 透传的字段在下次切换回对应算法时仍可使用，实现算法间无缝切换。
  *
  * 三条独立路径：
- * - SM2 路径：计算 sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
- * - Progressive 路径：计算 progressive_repetitions, progressive_interval
- * - Fixed 路径：计算 fixed_multiplier
- * - 所有路径：原样传递其他算法的字段（含 sm2_grade）+ algorithm + interaction
- *
- * 注意：sm2_grade 在 Fixed/Progressive 路径中也必须原样传递，
- * 否则 savePracticeData 重写 session block 时会丢失该字段，
- * 导致 emoji 显示异常（变为 ⚪）。
+ * - SM2 路径：输出 sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
+ *              透传 progressive_repetitions, progressive_interval
+ * - Progressive 路径：输出 progressive_repetitions, progressive_interval
+ *              透传 sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
+ * - FixedTime 路径：输出 fixed_multiplier, fixed_unit
+ *              透传 progressive_repetitions, progressive_interval, sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
  */
 export const generatePracticeData = ({
   dateCreated,
@@ -89,7 +80,6 @@ export const generatePracticeData = ({
       sm2_eFactor,
       progressive_repetitions,
       progressive_interval,
-      fixed_multiplier,
     } = props;
     const sm2Result = supermemo(
       { sm2_interval: sm2_interval || 0, sm2_repetitions: sm2_repetitions || 0, sm2_eFactor: sm2_eFactor || 2.5 },
@@ -106,7 +96,6 @@ export const generatePracticeData = ({
       sm2_eFactor: sm2Result.sm2_eFactor,
       ...(progressive_repetitions !== undefined && { progressive_repetitions }),
       ...(progressive_interval !== undefined && { progressive_interval }),
-      ...(fixed_multiplier !== undefined && { fixed_multiplier }),
       dateCreated: referenceDate,
       nextDueDate,
       nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
@@ -120,7 +109,6 @@ export const generatePracticeData = ({
       sm2_eFactor,
       sm2_interval,
       sm2_grade,
-      fixed_multiplier,
     } = props;
     const currentProgReps = progressive_repetitions || 0;
     const calculatedInterval = progressiveInterval(currentProgReps);
@@ -135,55 +123,51 @@ export const generatePracticeData = ({
       ...(sm2_eFactor !== undefined && { sm2_eFactor }),
       ...(sm2_interval !== undefined && { sm2_interval }),
       ...(sm2_grade !== undefined && { sm2_grade }),
-      ...(fixed_multiplier !== undefined && { fixed_multiplier }),
       dateCreated: referenceDate,
       nextDueDate,
       nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
     };
   }
 
-  const {
-    fixed_multiplier,
-    progressive_repetitions,
-    sm2_repetitions,
-    sm2_eFactor,
-    sm2_interval,
-    sm2_grade,
-  } = props;
-  let nextDueDate: Date | undefined;
-  let calculatedMultiplier = fixed_multiplier;
+  if (algorithm === SchedulingAlgorithm.FIXED_TIME) {
+    const {
+      fixed_multiplier,
+      fixed_unit,
+      progressive_repetitions,
+      progressive_interval,
+      sm2_repetitions,
+      sm2_eFactor,
+      sm2_interval,
+      sm2_grade,
+    } = props;
 
-  switch (algorithm) {
-    case SchedulingAlgorithm.FIXED_DAYS:
-      calculatedMultiplier = fixed_multiplier || 3;
-      nextDueDate = dateUtils.addDays(referenceDate, calculatedMultiplier);
-      break;
-    case SchedulingAlgorithm.FIXED_WEEKS:
-      calculatedMultiplier = fixed_multiplier || 3;
-      nextDueDate = dateUtils.addDays(referenceDate, calculatedMultiplier * 7);
-      break;
-    case SchedulingAlgorithm.FIXED_MONTHS:
-      calculatedMultiplier = fixed_multiplier || 3;
-      nextDueDate = dateUtils.addDays(referenceDate, calculatedMultiplier * 30);
-      break;
-    case SchedulingAlgorithm.FIXED_YEARS:
-      calculatedMultiplier = fixed_multiplier || 3;
-      nextDueDate = dateUtils.addDays(referenceDate, calculatedMultiplier * 365);
-      break;
+    const value = fixed_multiplier || 3;
+    const unit = fixed_unit || FixedTimeUnit.DAYS;
+    const unitDays: Record<FixedTimeUnit, number> = {
+      [FixedTimeUnit.DAYS]: 1,
+      [FixedTimeUnit.WEEKS]: 7,
+      [FixedTimeUnit.MONTHS]: 30,
+      [FixedTimeUnit.YEARS]: 365,
+    };
+    const nextDueDate = dateUtils.addDays(referenceDate, value * unitDays[unit]);
+
+    return {
+      algorithm,
+      interaction,
+      fixed_multiplier: value,
+      fixed_unit: unit,
+      ...(progressive_repetitions !== undefined && { progressive_repetitions }),
+      ...(progressive_interval !== undefined && { progressive_interval }),
+      ...(sm2_repetitions !== undefined && { sm2_repetitions }),
+      ...(sm2_eFactor !== undefined && { sm2_eFactor }),
+      ...(sm2_interval !== undefined && { sm2_interval }),
+      ...(sm2_grade !== undefined && { sm2_grade }),
+      nextDueDate,
+      nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
+    };
   }
 
-  return {
-    algorithm,
-    interaction,
-    fixed_multiplier: calculatedMultiplier,
-    ...(progressive_repetitions !== undefined && { progressive_repetitions }),
-    ...(sm2_repetitions !== undefined && { sm2_repetitions }),
-    ...(sm2_eFactor !== undefined && { sm2_eFactor }),
-    ...(sm2_interval !== undefined && { sm2_interval }),
-    ...(sm2_grade !== undefined && { sm2_grade }),
-    nextDueDate,
-    nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
-  };
+  throw new Error(`Unknown algorithm: ${algorithm}`);
 };
 
 export type PracticeProps = Session & {
@@ -203,6 +187,7 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     sm2_repetitions,
     sm2_eFactor,
     fixed_multiplier,
+    fixed_unit,
     progressive_repetitions,
     algorithm,
     interaction,
@@ -215,6 +200,7 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     sm2_eFactor,
     dateCreated,
     fixed_multiplier,
+    fixed_unit,
     progressive_repetitions,
     algorithm,
     interaction,

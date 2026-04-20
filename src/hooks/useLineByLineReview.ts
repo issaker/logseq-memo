@@ -71,7 +71,6 @@ interface UseLineByLineReviewInput {
   currentCardRefUid: string | undefined;
   childUidsList: string[];
   isLBLReviewMode: boolean;
-  isLBLReview: boolean;
   dataPageTitle: string;
   lblNextReinsertOffset: number;
   forgotReinsertOffset: number;
@@ -99,7 +98,6 @@ export default function useLineByLineReview({
   currentCardRefUid,
   childUidsList,
   isLBLReviewMode,
-  isLBLReview: _isLBLReview,
   dataPageTitle,
   lblNextReinsertOffset,
   forgotReinsertOffset,
@@ -181,24 +179,17 @@ export default function useLineByLineReview({
           dataPageTitle,
         });
 
-        setSessionOverrides((prev) => {
-          const updatedChildSessionData = {
-            ...prev[currentCardRefUid]?.childSessionData,
-            [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
-          };
-          return {
-            ...prev,
-            [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
-            [currentCardRefUid]: {
-              ...currentCardData,
-              algorithm,
-              interaction,
-              dateCreated: now,
-              nextDueDate: childNextDueDate,
-              childSessionData: updatedChildSessionData,
-            },
-          };
-        });
+        setSessionOverrides((prev) => ({
+          ...prev,
+          [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
+          [currentCardRefUid]: {
+            ...currentCardData,
+            algorithm,
+            interaction,
+            dateCreated: now,
+            nextDueDate: childNextDueDate,
+          },
+        }));
 
         const nextDueIndex = findNextDueChildIndex(
           childUidsList,
@@ -266,24 +257,17 @@ export default function useLineByLineReview({
         dataPageTitle,
       });
 
-      setSessionOverrides((prev) => {
-        const updatedChildSessionData = {
-          ...prev[currentCardRefUid]?.childSessionData,
-          [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
-        };
-        return {
-          ...prev,
-          [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
-          [currentCardRefUid]: {
-            ...currentCardData,
-            algorithm,
-            interaction,
-            dateCreated: now,
-            nextDueDate: childNextDueDate,
-            childSessionData: updatedChildSessionData,
-          },
-        };
-      });
+      setSessionOverrides((prev) => ({
+        ...prev,
+        [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
+        [currentCardRefUid]: {
+          ...currentCardData,
+          algorithm,
+          interaction,
+          dateCreated: now,
+          nextDueDate: childNextDueDate,
+        },
+      }));
 
       if (grade === 0 && forgotReinsertOffset > 0 && currentCardRefUid) {
         const forgotInsertIndex = currentIndex + 1 + forgotReinsertOffset;

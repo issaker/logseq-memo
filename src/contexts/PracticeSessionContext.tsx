@@ -19,8 +19,6 @@ export interface PracticeSessionContextValue {
   dataPageTitle: string;
   setRenderMode: (tag: string, mode: RenderMode) => void;
   updateSetting: (key: keyof Settings, value: any) => void;
-  dailyLimit: number;
-  historyCleanupKeepCount: number;
   algorithm?: SchedulingAlgorithm;
   interaction?: InteractionStyle;
   onSelectAlgorithm?: (algorithm: SchedulingAlgorithm) => void;
@@ -79,8 +77,6 @@ export const PracticeSessionProvider = ({
       dataPageTitle,
       setRenderMode,
       updateSetting,
-      dailyLimit: settings.dailyLimit,
-      historyCleanupKeepCount: settings.historyCleanupKeepCount,
     }),
     [
       settings,
