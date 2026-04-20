@@ -43,7 +43,7 @@ import {
 import useLineByLineReview, { shouldReinsertLblCard } from '~/hooks/useLineByLineReview';
 export { shouldReinsertLblCard };
 import useCurrentCardData from '~/hooks/useCurrentCardData';
-import { generateNewSession, updateReviewConfig } from '~/queries';
+import { generateNewSession, updateReviewConfig, getChildSessionData } from '~/queries';
 
 import { generatePracticeData } from '~/practice';
 import { CompletionStatus, RenderMode } from '~/models/practice';
@@ -60,6 +60,7 @@ interface MainContextProps {
   isLineByLine: boolean;
   lineByLineCurrentIndex: number;
   lineByLineTotal: number;
+  lineByLineDueCount: number;
   cardMeta: import('~/models/session').CardMeta | undefined;
   baseCardData: Session | undefined;
 }
@@ -226,11 +227,23 @@ const PracticeOverlay = ({
 
   const childUidsList = React.useMemo(() => blockInfo.childrenUids || [], [blockInfo.childrenUids]);
 
+  const [childSessionData, setChildSessionData] = React.useState<Record<string, Session>>({});
+
+  React.useEffect(() => {
+    if (!isLineByLineActive || !childUidsList.length || !dataPageTitle) {
+      setChildSessionData({});
+      return;
+    }
+    getChildSessionData({ childUids: childUidsList, dataPageTitle }).then((data) => {
+      setChildSessionData(data as Record<string, Session>);
+    });
+  }, [isLineByLineActive, childUidsList, dataPageTitle, currentCardRefUid]);
+
   const {
     lineByLineRevealedCount,
     lineByLineCurrentChildIndex,
     lineByLineIsCardComplete,
-    lineByLineProgress,
+    dueChildCount,
     onLineByLineGrade,
     onLineByLineShowAnswer,
   } = useLineByLineReview({
@@ -249,7 +262,7 @@ const PracticeOverlay = ({
     setCurrentIndex,
     setShowAnswers,
     setCardQueue,
-    lineByLineProgressStr: currentCardData?.lbl_progress,
+    childSessionData,
   });
 
   React.useEffect(() => {
@@ -581,6 +594,7 @@ const PracticeOverlay = ({
         isLineByLine: isLineByLineActive,
         lineByLineCurrentIndex: isLineByLineActive ? lineByLineCurrentChildIndex + 1 : 0,
         lineByLineTotal: isLineByLineActive ? childUidsList.length : 0,
+        lineByLineDueCount: isLineByLineActive ? dueChildCount : 0,
         cardMeta,
         baseCardData,
       }}
@@ -618,7 +632,7 @@ const PracticeOverlay = ({
                   childUidsList={childUidsList}
                   lineByLineRevealedCount={lineByLineRevealedCount}
                   lineByLineCurrentChildIndex={lineByLineCurrentChildIndex}
-                  lineByLineProgress={lineByLineProgress}
+                  childSessionData={childSessionData}
                   setHasCloze={setHasCloze}
                   showBreadcrumbs={showBreadcrumbs}
                 />

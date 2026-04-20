@@ -63,7 +63,7 @@ type PracticeDataResult = Session & { nextDueDateFromNow?: string };
  * - SM2 路径：计算 sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
  * - Progressive 路径：计算 progressive_repetitions, progressive_interval
  * - Fixed 路径：计算 fixed_multiplier
- * - 所有路径：原样传递其他算法的字段（含 sm2_grade）+ lbl_progress + algorithm + interaction
+ * - 所有路径：原样传递其他算法的字段（含 sm2_grade）+ algorithm + interaction
  *
  * 注意：sm2_grade 在 Fixed/Progressive 路径中也必须原样传递，
  * 否则 savePracticeData 重写 session block 时会丢失该字段，
@@ -88,7 +88,6 @@ export const generatePracticeData = ({
       progressive_repetitions,
       progressive_interval,
       fixed_multiplier,
-      lbl_progress,
     } = props;
     const sm2Result = supermemo(
       { sm2_interval: sm2_interval || 0, sm2_repetitions: sm2_repetitions || 0, sm2_eFactor: sm2_eFactor || 2.5 },
@@ -106,7 +105,6 @@ export const generatePracticeData = ({
       ...(progressive_repetitions !== undefined && { progressive_repetitions }),
       ...(progressive_interval !== undefined && { progressive_interval }),
       ...(fixed_multiplier !== undefined && { fixed_multiplier }),
-      ...(lbl_progress !== undefined && { lbl_progress }),
       dateCreated: referenceDate,
       nextDueDate,
       nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
@@ -120,7 +118,6 @@ export const generatePracticeData = ({
     sm2_eFactor,
     sm2_interval,
     sm2_grade,
-    lbl_progress,
   } = props;
   let nextDueDate: Date | undefined;
   let calculatedIntervalMultiplier = fixed_multiplier;
@@ -165,7 +162,6 @@ export const generatePracticeData = ({
     ...(sm2_eFactor !== undefined && { sm2_eFactor }),
     ...(sm2_interval !== undefined && { sm2_interval }),
     ...(sm2_grade !== undefined && { sm2_grade }),
-    ...(lbl_progress !== undefined && { lbl_progress }),
     nextDueDate,
     nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
   };

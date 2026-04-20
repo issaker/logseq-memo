@@ -46,7 +46,6 @@ describe('getPluginPageData', () => {
                       children: [
                         { string: 'algorithm:: SM2' },
                         { string: 'interaction:: NORMAL' },
-                        { string: 'lbl_progress:: {"child-1":{"sm2_interval":6}}' },
                         { string: 'nextDueDate:: [[April 20th, 2026]]' },
                       ],
                     },
@@ -76,7 +75,6 @@ describe('getPluginPageData', () => {
     expect(result['card-1']).toMatchObject({
       algorithm: 'SM2',
       interaction: 'NORMAL',
-      lbl_progress: '{"child-1":{"sm2_interval":6}}',
     });
     const cardData = result['card-1'] as any;
     expect(cardData.nextDueDate).toEqual(new Date('2026-04-20T00:00:00.000Z'));

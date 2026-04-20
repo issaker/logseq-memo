@@ -81,7 +81,6 @@ export default function useCurrentCardData({
         const initialMeta: CardMeta = {
           algorithm: derivedAlgorithm,
           interaction: derivedInteraction,
-          lbl_progress: latestSession.lbl_progress as string | undefined,
           nextDueDate: latestSession.nextDueDate,
         };
         setCardMeta(initialMeta);

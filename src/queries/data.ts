@@ -11,7 +11,6 @@
  *   │   │   │   ├── algorithm:: SM2
  *   │   │   │   ├── interaction:: NORMAL
  *   │   │   │   ├── nextDueDate:: [[Date]]
- *   │   │   │   ├── lbl_progress:: {...}
  *   │   │   │   ├── sm2_grade:: 5
  *   │   │   │   ├── sm2_eFactor:: 2.5
  *   │   │   │   └── sm2_repetitions:: 3
@@ -28,7 +27,7 @@
  *       └── ...
  *
  * Key Design Principle:
- *   All fields (algorithm, interaction, nextDueDate, lbl_progress, sm2_grade, sm2_eFactor,
+ *   All fields (algorithm, interaction, nextDueDate, sm2_grade, sm2_eFactor,
  *   sm2_repetitions, sm2_interval, progressive_repetitions, progressive_interval, fixed_multiplier)
  *   are stored uniformly in session blocks. The latest session block is the
  *   single source of truth for the card's current state.
@@ -147,7 +146,6 @@ export const SESSION_SNAPSHOT_KEYS = [
   'algorithm',
   'interaction',
   'nextDueDate',
-  'lbl_progress',
   'sm2_repetitions',
   'sm2_interval',
   'sm2_eFactor',
@@ -196,8 +194,6 @@ const parseFieldValuesFromChildren = (object, children) => {
 
     if (key === 'nextDueDate') {
       object[key] = parseRoamDateString(getStringBetween(value, '[[', ']]'));
-    } else if (key === 'lbl_progress') {
-      object[key] = value;
     } else if (key === 'algorithm') {
       object[key] = value;
     } else if (key === 'interaction') {
@@ -419,6 +415,31 @@ export const getSessionData = async ({
     sessionData: selectedTagCardsData,
     cardUids: allTagCardsUids,
   };
+};
+
+export const getChildSessionData = async ({
+  childUids,
+  dataPageTitle,
+}: {
+  childUids: string[];
+  dataPageTitle: string;
+}): Promise<Records> => {
+  if (!childUids.length) return {};
+
+  const pluginPageData = (await getPluginPageData({
+    dataPageTitle,
+    limitToLatest: true,
+  })) as Records;
+
+  const result: Records = {};
+
+  for (const uid of childUids) {
+    if (pluginPageData[uid]) {
+      result[uid] = pluginPageData[uid];
+    }
+  }
+
+  return result;
 };
 
 /**

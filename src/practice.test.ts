@@ -129,7 +129,6 @@ describe('supermemo: simulate practice', () => {
         sm2_eFactor: 2.5,
       });
 
-      expect(result.lbl_progress).toBeUndefined();
       expect(result.algorithm).toBe(SchedulingAlgorithm.SM2);
     });
   });
@@ -245,47 +244,6 @@ describe('supermemo: simulate practice', () => {
       expect(progResult.sm2_repetitions).toBe(sm2Result.sm2_repetitions);
       expect(progResult.sm2_eFactor).toBe(sm2Result.sm2_eFactor);
       expect(progResult.progressive_repetitions).toBe(1);
-    });
-
-    test('Mode switches preserve lbl_progress snapshot', () => {
-      const lbl_progress = JSON.stringify({
-        'child-1': {
-          nextDueDate: '2026-04-20T00:00:00.000Z',
-          sm2_interval: 6,
-          sm2_repetitions: 2,
-          sm2_eFactor: 2.5,
-          progressive_repetitions: 1,
-        },
-      });
-
-      const progResult = practice.generatePracticeData({
-        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        algorithm: SchedulingAlgorithm.PROGRESSIVE,
-        interaction: InteractionStyle.NORMAL,
-        sm2_interval: 11,
-        sm2_repetitions: 3,
-        sm2_eFactor: 2.26,
-        progressive_repetitions: 2,
-        progressive_interval: 12,
-        lbl_progress,
-      });
-
-      expect(progResult.lbl_progress).toBe(lbl_progress);
-
-      const sm2Result = practice.generatePracticeData({
-        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        algorithm: SchedulingAlgorithm.SM2,
-        interaction: InteractionStyle.NORMAL,
-        sm2_grade: 4,
-        sm2_interval: progResult.sm2_interval,
-        sm2_repetitions: progResult.sm2_repetitions,
-        sm2_eFactor: progResult.sm2_eFactor,
-        progressive_repetitions: progResult.progressive_repetitions,
-        progressive_interval: progResult.progressive_interval,
-        lbl_progress: progResult.lbl_progress,
-      });
-
-      expect(sm2Result.lbl_progress).toBe(lbl_progress);
     });
 
     test('Switching Progressive -> SM2 preserves Progressive fields', () => {

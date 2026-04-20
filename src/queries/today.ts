@@ -79,16 +79,9 @@ export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) 
         cardData && dateUtils.isSameDay(cardData.dateCreated, new Date());
 
       if (isCompletedToday) {
-        if (cardData.interaction === 'LBL' && cardData.lbl_progress) {
-          try {
-            const progress = JSON.parse(cardData.lbl_progress);
-            const hasDueChildren = Object.values(progress).some(
-              (child: any) => child?.nextDueDate && new Date(child.nextDueDate) <= new Date()
-            );
-            if (hasDueChildren) return;
-          } catch {
-            // lbl_progress parse failed, fall through to count as completed
-          }
+        if (cardData.interaction === 'LBL') {
+          const now = new Date();
+          if (cardData.nextDueDate && cardData.nextDueDate <= now) return;
         }
 
         count++;

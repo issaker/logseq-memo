@@ -314,6 +314,7 @@ const Header = ({
     isLineByLine,
     lineByLineCurrentIndex,
     lineByLineTotal,
+    lineByLineDueCount,
   } = useSafeContext(MainContext);
   const todaySelectedTag = today.tags[selectedTag];
   const completedTodayCount = todaySelectedTag.completed;
@@ -337,7 +338,7 @@ const Header = ({
       <div className="flex items-center justify-end">
         {isLineByLine && !isDone && (
           <Blueprint.Tag intent="none" minimal style={{ fontSize: '10px', marginRight: '4px' }} className="mobile-hide">
-            L{lineByLineCurrentIndex}/{lineByLineTotal}
+            L{lineByLineCurrentIndex}/{lineByLineTotal} ({lineByLineDueCount} due)
           </Blueprint.Tag>
         )}
         {!isDone && (

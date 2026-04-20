@@ -9,17 +9,20 @@
  *   - sm2_*:      SM2 algorithm fields
  *   - progressive_*: Progressive algorithm fields
  *   - fixed_*:    Fixed interval algorithm fields
- *   - lbl_*:      Line by Line interaction fields
  *   - (no prefix): Universal/config fields
  *
  *   Session block fields:
  *   - algorithm:          Scheduling algorithm (SM2, PROGRESSIVE, FIXED_DAYS, etc.)
  *   - interaction:        Interaction style (NORMAL, LBL)
  *   - nextDueDate:        Next due date for the card.
- *   - lbl_progress:       JSON string tracking per-child progress for LBL cards.
  *   - sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor: SM2-specific parameters.
  *   - progressive_repetitions, progressive_interval: Progressive-specific parameters.
  *   - fixed_multiplier:   Fixed interval user-configured multiplier.
+ *
+ *   LBL architecture:
+ *   Child blocks in LBL mode have their own independent Session entries
+ *   in the data page (same structure as any other card). The parent block
+ *   only stores algorithm, interaction, and nextDueDate (computed from children).
  */
 
 interface SessionCommon {
@@ -37,14 +40,12 @@ export type Session = {
   progressive_repetitions?: number;
   progressive_interval?: number;
   fixed_multiplier?: number;
-  lbl_progress?: string;
   baseSessionData?: Session;
 } & SessionCommon;
 
 export interface CardMeta {
   algorithm: SchedulingAlgorithm;
   interaction: InteractionStyle;
-  lbl_progress?: string;
   nextDueDate?: Date;
 }
 
@@ -61,16 +62,6 @@ export interface Records {
 export interface CompleteRecords {
   [key: RecordUid]: Session[];
 }
-
-export interface LineByLineChildData {
-  nextDueDate: string;
-  sm2_interval?: number;
-  sm2_repetitions?: number;
-  sm2_eFactor?: number;
-  progressive_repetitions?: number;
-}
-
-export type LineByLineProgressMap = Record<string, LineByLineChildData>;
 
 export enum SchedulingAlgorithm {
   SM2 = 'SM2',

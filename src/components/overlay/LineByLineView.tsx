@@ -2,6 +2,7 @@ import * as React from 'react';
 import styled from '@emotion/styled';
 import CardBlock from '~/components/overlay/CardBlock';
 import { colors } from '~/theme';
+import { Session } from '~/models/session';
 import useBlockInfo from '~/hooks/useBlockInfo';
 
 interface LineByLineViewProps {
@@ -9,21 +10,41 @@ interface LineByLineViewProps {
   childUidsList: string[];
   lineByLineRevealedCount: number;
   lineByLineCurrentChildIndex: number;
-  lineByLineProgress: Record<string, any>;
+  childSessionData: Record<string, Session>;
   setHasCloze: (hasCloze: boolean) => void;
   showBreadcrumbs: boolean;
 }
+
+const getDueChildCount = (
+  childUidsList: string[],
+  childSessionData: Record<string, Session>
+): number => {
+  const now = new Date();
+  let count = 0;
+  for (const uid of childUidsList) {
+    const session = childSessionData[uid];
+    if (!session || !session.nextDueDate || session.nextDueDate <= now) {
+      count++;
+    }
+  }
+  return count;
+};
 
 const LineByLineView = ({
   currentCardRefUid,
   childUidsList,
   lineByLineRevealedCount,
   lineByLineCurrentChildIndex,
-  lineByLineProgress,
+  childSessionData,
   setHasCloze,
   showBreadcrumbs,
 }: LineByLineViewProps) => {
   const { blockInfo } = useBlockInfo({ refUid: currentCardRefUid });
+
+  const dueCount = React.useMemo(
+    () => getDueChildCount(childUidsList, childSessionData),
+    [childUidsList, childSessionData]
+  );
 
   return (
     <>
@@ -37,15 +58,15 @@ const LineByLineView = ({
         hideChildren={true}
       />
       <LineByLineSeparator>
-        Line {lineByLineCurrentChildIndex + 1} / {childUidsList.length}
+        Line {lineByLineCurrentChildIndex + 1} / {childUidsList.length} ({dueCount} due)
       </LineByLineSeparator>
       {childUidsList.slice(0, lineByLineRevealedCount).map((uid, index) => {
         const isCurrentLine = index === lineByLineCurrentChildIndex;
-        const childProgress = lineByLineProgress[uid];
+        const childSession = childSessionData[uid];
         const isMastered =
-          childProgress && new Date(childProgress.nextDueDate) > new Date();
+          childSession && childSession.nextDueDate && childSession.nextDueDate > new Date();
         return (
-          <LineByLineItem key={uid} $isCurrent={isCurrentLine} $isMastered={isMastered}>
+          <LineByLineItem key={uid} $isCurrent={isCurrentLine} $isMastered={!!isMastered}>
             <CardBlock
               refUid={uid}
               showAnswers={true}

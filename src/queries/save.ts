@@ -9,12 +9,19 @@
  *   │   ├── algorithm:: SM2
  *   │   ├── interaction:: NORMAL
  *   │   ├── nextDueDate:: [[Date]]
- *   │   ├── lbl_progress:: {...}
  *   │   ├── sm2_grade:: 5
  *   │   ├── sm2_eFactor:: 2.5
  *   │   └── ...
  *   └── [[Date]] 🔴            ← older session block
  *       └── ...
+ *
+ * LBL child blocks have their own independent session entries:
+ *   ((childUid))
+ *   ├── [[Date]] 🟢
+ *   │   ├── algorithm:: SM2
+ *   │   ├── interaction:: NORMAL
+ *   │   ├── nextDueDate:: [[Date]]
+ *   │   └── ...
  *
  * The meta block has been removed. algorithm and interaction are now
  * stored in each session record alongside algorithm-specific fields.
@@ -22,7 +29,7 @@
  */
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
-import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle, isFixedAlgorithm } from '~/models/session';
+import { SchedulingAlgorithm, InteractionStyle, isFixedAlgorithm } from '~/models/session';
 import {
   createChildBlock,
   getChildBlock,
@@ -30,7 +37,7 @@ import {
   getOrCreateChildBlock,
   getOrCreatePage,
 } from '~/queries/utils';
-import { SESSION_SNAPSHOT_KEYS } from '~/queries/data';
+import { SESSION_SNAPSHOT_KEYS, getChildSessionData } from '~/queries/data';
 
 const NUMERIC_SESSION_KEYS = [
   'sm2_grade',
@@ -117,7 +124,7 @@ const upsertLatestSessionField = async ({
 
 /**
  * Save a single practice session result to the data page.
- * All fields (including algorithm, interaction, nextDueDate, lbl_progress)
+ * All fields (including algorithm, interaction, nextDueDate)
  * are written to the session block.
  *
  * 同日 Session Block 去重逻辑：
@@ -214,9 +221,6 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
     if (key === 'nextDueDate') {
       value = `[[${stringUtils.dateToRoamDateString(nextDueDate)}]]`;
     }
-    if (key === 'lbl_progress') {
-      value = JSON.stringify(data[key]);
-    }
 
     await createChildBlock(sessionBlockUid, `${key}:: ${value}`, -1);
   }
@@ -230,22 +234,21 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
 };
 
 /**
- * Update lineByLineProgress in the latest session block.
- * Also updates nextDueDate:
- *   - If there are unread children (progress entries < totalChildren),
- *     sets nextDueDate to today so the card stays "due" in subsequent sessions.
- *   - Otherwise, sets nextDueDate to the earliest child due date.
+ * Update the parent LBL block's nextDueDate based on child block sessions.
+ * Called after grading a child block in LBL mode.
+ *
+ * Logic:
+ *   - If any child block has no session or is due → nextDueDate = today
+ *   - Otherwise → nextDueDate = earliest child nextDueDate
  */
-export const updateLineByLineProgress = async ({
+export const updateParentNextDueDate = async ({
   refUid,
+  childUids,
   dataPageTitle,
-  progress,
-  totalChildren,
 }: {
   refUid: string;
+  childUids: string[];
   dataPageTitle: string;
-  progress: LineByLineProgressMap;
-  totalChildren?: number;
 }) => {
   await getOrCreatePage(dataPageTitle);
   const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
@@ -256,38 +259,41 @@ export const updateLineByLineProgress = async ({
   const cardDataBlockUid = await getChildBlock(dataBlockUid, `((${refUid}))`);
   if (!cardDataBlockUid) return;
 
-  const progressString = JSON.stringify(progress);
-  await upsertLatestSessionField({
-    cardDataBlockUid,
-    key: 'lbl_progress',
-    value: progressString,
-  });
+  const childSessions = await getChildSessionData({ childUids, dataPageTitle });
 
-  const reviewedCount = Object.keys(progress).length;
-  const hasUnreadChildren = totalChildren !== undefined && reviewedCount < totalChildren;
+  const now = new Date();
+  let hasDueOrUnread = false;
+  let earliestDueDate: Date | null = null;
 
-  if (hasUnreadChildren) {
-    const todayString = `[[${stringUtils.dateToRoamDateString(new Date())}]]`;
+  for (const uid of childUids) {
+    const session = childSessions[uid] as any;
+    if (!session || !session.nextDueDate) {
+      hasDueOrUnread = true;
+      break;
+    }
+    if (session.nextDueDate <= now) {
+      hasDueOrUnread = true;
+      break;
+    }
+    if (!earliestDueDate || session.nextDueDate < earliestDueDate) {
+      earliestDueDate = session.nextDueDate;
+    }
+  }
+
+  if (hasDueOrUnread) {
+    const todayString = `[[${stringUtils.dateToRoamDateString(now)}]]`;
     await upsertLatestSessionField({
       cardDataBlockUid,
       key: 'nextDueDate',
       value: todayString,
     });
-  } else {
-    const earliestDueDate = Object.values(progress).reduce((earliest, child) => {
-      if (!child?.nextDueDate) return earliest;
-      const d = new Date(child.nextDueDate);
-      return !earliest || d < earliest ? d : earliest;
-    }, null as Date | null);
-
-    if (earliestDueDate) {
-      const dueDateString = `[[${stringUtils.dateToRoamDateString(earliestDueDate)}]]`;
-      await upsertLatestSessionField({
-        cardDataBlockUid,
-        key: 'nextDueDate',
-        value: dueDateString,
-      });
-    }
+  } else if (earliestDueDate) {
+    const dueDateString = `[[${stringUtils.dateToRoamDateString(earliestDueDate)}]]`;
+    await upsertLatestSessionField({
+      cardDataBlockUid,
+      key: 'nextDueDate',
+      value: dueDateString,
+    });
   }
 };
 

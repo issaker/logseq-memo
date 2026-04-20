@@ -8,6 +8,7 @@
  * Phase 3: Convert reviewMode → algorithm + interaction in session blocks
  * Phase 4: Deduplicate algorithm/interaction fields + rename old field names to {owner}_{purpose} convention + convert READ → LBL
  * Phase 5: Compact latest session snapshots (fill missing fields from merged history)
+ * Phase 6: Migrate lbl_progress / lineByLineProgress to independent child block sessions
  */
 import * as React from 'react';
 import { Alert } from '@blueprintjs/core';
@@ -716,7 +717,6 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         progressiveRepetitions: 'progressive_repetitions',
         progressiveInterval: 'progressive_interval',
         intervalMultiplier: 'fixed_multiplier',
-        lineByLineProgress: 'lbl_progress',
       };
 
       const FIELDS_TO_DELETE = ['intervalMultiplierType', 'lineByLineReview'];
@@ -885,8 +885,6 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                 day: 'numeric',
               }).replace(/(\d+)(st|nd|rd|th)/, '$1$2');
               missingFields.push({ key, value: `[[${dateStr}]]` });
-            } else if (key === 'lbl_progress') {
-              missingFields.push({ key, value: typeof value === 'string' ? value : JSON.stringify(value) });
             } else {
               missingFields.push({ key, value: String(value) });
             }
@@ -933,9 +931,213 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         errors: phase5Errors,
       });
 
+      setProgress({
+        total,
+        migrated,
+        skipped,
+        phase: 'Phase 6: Migrating lbl_progress to child block sessions',
+      });
+
+      let phase6Migrated = 0;
+      let phase6Skipped = 0;
+      let phase6Errors = 0;
+
+      try {
+        const lblDataPageUid = await window.roamAlphaAPI.q(
+          `[:find ?uid . :in $ ?title :where [?b :node/title ?title] [?b :block/uid ?uid]]`,
+          dataPageTitle
+        );
+
+        if (lblDataPageUid) {
+          const lblDataBlockQuery = `[
+            :find (pull ?dataBlock [:block/uid {:block/children [:block/uid :block/string {:block/children [:block/uid :block/string :block/order {:block/children [:block/uid :block/string]}]}]}])
+            :in $ ?dataPageUid ?dataBlockName
+            :where
+            [?dataPage :block/uid ?dataPageUid]
+            [?dataPage :block/children ?dataBlock]
+            [?dataBlock :block/string ?dataBlockName]
+          ]`;
+
+          const lblDataBlockResult = await window.roamAlphaAPI.q(lblDataBlockQuery, lblDataPageUid, 'data');
+
+          if (lblDataBlockResult && lblDataBlockResult.length && lblDataBlockResult[0][0]) {
+            const lblDataBlock = lblDataBlockResult[0][0];
+            const lblCardEntries = lblDataBlock.children || [];
+
+            const lblPluginPageData = await getPluginPageData({ dataPageTitle, limitToLatest: true });
+
+            for (const cardEntry of lblCardEntries) {
+              const cardString = cardEntry.string || '';
+              const cardUidMatch = cardString.match(/\(\(([a-zA-Z0-9_-]+)\)\)/);
+              if (!cardUidMatch) continue;
+              const cardUid = cardUidMatch[1];
+
+              const sessionData = lblPluginPageData[cardUid] as any;
+              if (!sessionData || sessionData.interaction !== 'LBL') {
+                phase6Skipped++;
+                continue;
+              }
+
+              let lblProgressValue: string | null = null;
+              const sessionBlocks = cardEntry.children || [];
+              for (const sessionBlock of sessionBlocks) {
+                if (!sessionBlock.children) continue;
+                for (const fieldBlock of sessionBlock.children) {
+                  const [key, value] = parseConfigString(fieldBlock.string || '');
+                  if (key === 'lbl_progress' || key === 'lineByLineProgress') {
+                    lblProgressValue = value;
+                  }
+                }
+              }
+
+              if (!lblProgressValue) {
+                phase6Skipped++;
+                continue;
+              }
+
+              setProgress((prev) => ({
+                ...prev,
+                phase: `Phase 6: Migrating LBL card ${cardUid}...`,
+              }));
+
+              try {
+                let progressData: Record<string, any> = {};
+                try {
+                  progressData = JSON.parse(lblProgressValue);
+                } catch {
+                  phase6Skipped++;
+                  continue;
+                }
+
+                const childUids = Object.keys(progressData);
+                if (!childUids.length) {
+                  phase6Skipped++;
+                  continue;
+                }
+
+                for (const childUid of childUids) {
+                  const childData = progressData[childUid];
+                  if (!childData) continue;
+
+                  const childCardString = `((${childUid}))`;
+                  const existingChildBlock = await window.roamAlphaAPI.q(
+                    `[:find (pull ?b [:block/uid]) :in $ ?parentUid ?childStr :where [?parent :block/uid ?parentUid] [?parent :block/children ?b] [?b :block/string ?childStr]]`,
+                    lblDataBlock.uid,
+                    childCardString
+                  );
+
+                  if (existingChildBlock && existingChildBlock.length > 0) {
+                    continue;
+                  }
+
+                  const now = new Date();
+                  const dateStr = now.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  }).replace(/(\d+)(st|nd|rd|th)/, '$1$2');
+
+                  const algorithm = sessionData.algorithm || 'SM2';
+
+                  await window.roamAlphaAPI.createBlock({
+                    location: { 'parent-uid': lblDataBlock.uid, order: -1 },
+                    block: { string: childCardString, open: false },
+                  });
+
+                  const createdChildBlock = await window.roamAlphaAPI.q(
+                    `[:find (pull ?b [:block/uid]) :in $ ?parentUid ?childStr :where [?parent :block/uid ?parentUid] [?parent :block/children ?b] [?b :block/string ?childStr]]`,
+                    lblDataBlock.uid,
+                    childCardString
+                  );
+
+                  if (!createdChildBlock || !createdChildBlock.length) continue;
+
+                  const childDataBlockUid = createdChildBlock[0][0].uid;
+                  const sessionTitle = `[[${dateStr}]] 🟢`;
+
+                  await window.roamAlphaAPI.createBlock({
+                    location: { 'parent-uid': childDataBlockUid, order: 0 },
+                    block: { string: sessionTitle, open: false },
+                  });
+
+                  const createdSessionBlock = await window.roamAlphaAPI.q(
+                    `[:find (pull ?b [:block/uid]) :in $ ?parentUid ?title :where [?parent :block/uid ?parentUid] [?parent :block/children ?b] [?b :block/string ?title]]`,
+                    childDataBlockUid,
+                    sessionTitle
+                  );
+
+                  if (!createdSessionBlock || !createdSessionBlock.length) continue;
+
+                  const newSessionUid = createdSessionBlock[0][0].uid;
+
+                  const fieldsToCreate: string[] = [];
+                  fieldsToCreate.push(`algorithm:: ${algorithm}`);
+                  fieldsToCreate.push(`interaction:: NORMAL`);
+
+                  if (childData.nextDueDate) {
+                    const dueDate = new Date(childData.nextDueDate);
+                    const dueDateStr = dueDate.toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    }).replace(/(\d+)(st|nd|rd|th)/, '$1$2');
+                    fieldsToCreate.push(`nextDueDate:: [[${dueDateStr}]]`);
+                  }
+                  if (childData.sm2_interval !== undefined) fieldsToCreate.push(`sm2_interval:: ${childData.sm2_interval}`);
+                  if (childData.sm2_repetitions !== undefined) fieldsToCreate.push(`sm2_repetitions:: ${childData.sm2_repetitions}`);
+                  if (childData.sm2_eFactor !== undefined) fieldsToCreate.push(`sm2_eFactor:: ${childData.sm2_eFactor}`);
+                  if (childData.progressive_repetitions !== undefined) fieldsToCreate.push(`progressive_repetitions:: ${childData.progressive_repetitions}`);
+
+                  for (const fieldString of fieldsToCreate) {
+                    await window.roamAlphaAPI.createBlock({
+                      location: { 'parent-uid': newSessionUid, order: -1 },
+                      block: { string: fieldString, open: false },
+                    });
+                  }
+                }
+
+                for (const sessionBlock of sessionBlocks) {
+                  if (!sessionBlock.children) continue;
+                  for (const fieldBlock of sessionBlock.children) {
+                    const [key] = parseConfigString(fieldBlock.string || '');
+                    if (key === 'lbl_progress' || key === 'lineByLineProgress') {
+                      await window.roamAlphaAPI.deleteBlock({ block: { uid: fieldBlock.uid } });
+                    }
+                  }
+                }
+
+                phase6Migrated++;
+                if (phase6Migrated % 5 === 0) {
+                  setProgress((prev) => ({
+                    ...prev,
+                    phase: `Phase 6: Migrated ${phase6Migrated} LBL cards...`,
+                  }));
+                  await sleep(BATCH_DELAY_MS);
+                } else {
+                  await sleep(CARD_DELAY_MS);
+                }
+              } catch (err) {
+                console.error(`[Memo] Phase 6 LBL migration error for card ${cardUid}:`, err);
+                errMsgs.push(`Phase 6 card ${cardUid}: ${err instanceof Error ? err.message : String(err)}`);
+                phase6Errors++;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Memo] Phase 6 LBL migration error:', err);
+        errMsgs.push(`Phase 6 LBL: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      debugLog(`[Memo] Phase 6 summary:`, {
+        migrated: phase6Migrated,
+        skipped: phase6Skipped,
+        errors: phase6Errors,
+      });
+
       setProgress({ total, migrated, skipped, phase: 'Done' });
 
-      const totalErrors = errors + phase3Errors;
+      const totalErrors = errors + phase3Errors + phase6Errors;
       if (totalErrors > 0) {
         setErrorDetail(`${totalErrors} cards had errors.`);
         setErrorMessages(errMsgs);
@@ -964,8 +1166,9 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
       >
         <p>
           This migration will convert <strong>reviewMode</strong> fields to the new{' '}
-          <strong>algorithm</strong> + <strong>interaction</strong> format, and delete the old{' '}
-          reviewMode field blocks.
+          <strong>algorithm</strong> + <strong>interaction</strong> format, rename legacy field names,
+          delete redundant fields, and migrate <strong>lbl_progress</strong> data to independent
+          child block sessions.
         </p>
         {scanResult && (
           <p>

@@ -212,7 +212,6 @@ describe('useCurrentCardData', () => {
         result.current.applyOptimisticCardMeta({
           algorithm: SchedulingAlgorithm.SM2,
           interaction: InteractionStyle.NORMAL,
-          lbl_progress: undefined,
         });
       });
 

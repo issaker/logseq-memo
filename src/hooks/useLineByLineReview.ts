@@ -1,24 +1,32 @@
 /**
  * LBL (Line by Line) 逐行复习 Hook。
  *
- * LBL 的行为完全由算法决定：
- * - LBL + SM2: 每行子 block 用 SM2 打分（Forgot/Hard/Good/Perfect），Forgot 触发插队
- * - LBL + Progressive/Fixed: 每行子 block 只显示 Next 按钮，点击后插队 N 张再读下一行
+ * 核心架构：子 Block 拥有完整独立的 Session Data。
+ * - 每个子 Block 在数据页中有自己的 ((childUid)) 条目
+ * - 父级 LBL Block 仅存储 algorithm, interaction, nextDueDate
+ * - 子 Block 可随时加入任意牌组成为独立卡片
+ *
+ * 自动跳过逻辑：
+ * - 到期/未读子 Block：需要用户交互（Show Answer + 打分 / Read+Next）
+ * - 已掌握子 Block：自动显示（降低透明度+绿色边框），无需用户交互
+ * - 复习完一个到期子 Block 后，自动前进到下一个到期子 Block
+ *
+ * 插队机制：
+ * - LBL + Fixed (LblNext)：Read 后插队，N 张后继续顺延逐行学习
+ * - LBL + SM2 Forgot：Forgot 后插队，N 张后继续顺延逐行学习
+ * - 插队回来后，从下一个到期子 Block 继续（不从头开始）
  *
  * 算法独立原则：
  * - 每个算法只操作自己的字段，其他算法字段原样传递
  * - sessionOverrides 必须包含 algorithm 和 interaction，确保插队后卡片模式不丢失
  */
 import * as React from 'react';
-import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle, isFixedAlgorithm } from '~/models/session';
-import { updateLineByLineProgress } from '~/queries';
-import { progressiveInterval, supermemo } from '~/practice';
+import { SchedulingAlgorithm, InteractionStyle, Session, isFixedAlgorithm } from '~/models/session';
+import { savePracticeData, updateParentNextDueDate } from '~/queries';
+import { generatePracticeData, progressiveInterval, supermemo } from '~/practice';
+import { generateNewSession } from '~/queries/utils';
 import * as dateUtils from '~/utils/date';
 
-/**
- * 判断 LBL + Fixed 算法下是否应插队。
- * 条件：lblNextReinsertOffset > 0 且当前子 block 不是最后一个（最后一个无需插队）。
- */
 export const shouldReinsertLblCard = ({
   currentChildIndex,
   totalChildren,
@@ -29,13 +37,34 @@ export const shouldReinsertLblCard = ({
   lblNextReinsertOffset: number;
 }) => lblNextReinsertOffset > 0 && currentChildIndex < totalChildren - 1;
 
-const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
-  if (!progressStr) return {};
-  try {
-    return JSON.parse(progressStr);
-  } catch {
-    return {};
+const getDueChildIndices = (
+  childUidsList: string[],
+  childSessionData: Record<string, Session>
+): number[] => {
+  const now = new Date();
+  return childUidsList.reduce((indices, uid, index) => {
+    const session = childSessionData[uid];
+    if (!session || !session.nextDueDate || session.nextDueDate <= now) {
+      indices.push(index);
+    }
+    return indices;
+  }, [] as number[]);
+};
+
+const findNextDueChildIndex = (
+  childUidsList: string[],
+  childSessionData: Record<string, Session>,
+  fromIndex: number
+): number => {
+  const now = new Date();
+  for (let i = fromIndex; i < childUidsList.length; i++) {
+    const uid = childUidsList[i];
+    const session = childSessionData[uid];
+    if (!session || !session.nextDueDate || session.nextDueDate <= now) {
+      return i;
+    }
   }
+  return childUidsList.length;
 };
 
 interface UseLineByLineReviewInput {
@@ -54,14 +83,14 @@ interface UseLineByLineReviewInput {
   setCurrentIndex: React.Dispatch<React.SetStateAction<number>>;
   setShowAnswers: React.Dispatch<React.SetStateAction<boolean>>;
   setCardQueue: React.Dispatch<React.SetStateAction<string[]>>;
-  lineByLineProgressStr?: string;
+  childSessionData: Record<string, Session>;
 }
 
 interface UseLineByLineReviewOutput {
   lineByLineRevealedCount: number;
   lineByLineCurrentChildIndex: number;
   lineByLineIsCardComplete: boolean;
-  lineByLineProgress: LineByLineProgressMap;
+  dueChildCount: number;
   onLineByLineGrade: (grade: number) => void;
   onLineByLineShowAnswer: () => void;
 }
@@ -70,7 +99,7 @@ export default function useLineByLineReview({
   currentCardRefUid,
   childUidsList,
   isLBLReviewMode,
-  isLBLReview,
+  isLBLReview: _isLBLReview,
   dataPageTitle,
   lblNextReinsertOffset,
   forgotReinsertOffset,
@@ -82,16 +111,19 @@ export default function useLineByLineReview({
   setCurrentIndex,
   setShowAnswers,
   setCardQueue,
-  lineByLineProgressStr,
+  childSessionData,
 }: UseLineByLineReviewInput): UseLineByLineReviewOutput {
   const isLblNext = isFixedAlgorithm(algorithm);
-  const lineByLineProgress = React.useMemo(
-    () => parseLineByLineProgress(lineByLineProgressStr),
-    [lineByLineProgressStr]
-  );
 
   const [lineByLineRevealedCount, setLineByLineRevealedCount] = React.useState(0);
   const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);
+
+  const dueChildIndices = React.useMemo(
+    () => getDueChildIndices(childUidsList, childSessionData),
+    [childUidsList, childSessionData]
+  );
+
+  const dueChildCount = dueChildIndices.length;
 
   React.useEffect(() => {
     if (!isLBLReviewMode || !childUidsList.length) {
@@ -100,27 +132,15 @@ export default function useLineByLineReview({
       return;
     }
 
-    const now = new Date();
-    let firstDueIndex = childUidsList.length;
-    for (let i = 0; i < childUidsList.length; i++) {
-      const uid = childUidsList[i];
-      const childData = lineByLineProgress[uid];
-      if (!childData) {
-        firstDueIndex = i;
-        break;
-      }
-      if (new Date(childData.nextDueDate) <= now) {
-        firstDueIndex = i;
-        break;
-      }
-    }
+    const firstDueIndex = findNextDueChildIndex(childUidsList, childSessionData, 0);
     setLineByLineCurrentChildIndex(firstDueIndex);
+
     if (isLblNext) {
       setLineByLineRevealedCount(firstDueIndex + 1);
     } else {
       setLineByLineRevealedCount(firstDueIndex);
     }
-  }, [isLBLReviewMode, isLblNext, currentCardRefUid, childUidsList, lineByLineProgress]);
+  }, [isLBLReviewMode, isLblNext, currentCardRefUid, childUidsList, childSessionData]);
 
   const lineByLineIsCardComplete =
     isLBLReviewMode && lineByLineCurrentChildIndex >= childUidsList.length;
@@ -130,46 +150,64 @@ export default function useLineByLineReview({
       if (!currentCardRefUid || lineByLineCurrentChildIndex >= childUidsList.length) return;
 
       const childUid = childUidsList[lineByLineCurrentChildIndex];
+      const existingChildSession = childSessionData[childUid] || generateNewSession({ algorithm });
+      const now = new Date();
 
       if (isLblNext) {
-        const existingData = lineByLineProgress[childUid];
-        const progReps = existingData?.progressive_repetitions || 0;
+        const progReps = existingChildSession.progressive_repetitions || 0;
         const nextInterval = progressiveInterval(progReps);
-
-        const now = new Date();
         const childNextDueDate = dateUtils.addDays(now, nextInterval);
 
-        const updatedProgress: LineByLineProgressMap = {
-          ...lineByLineProgress,
-          [childUid]: {
-            nextDueDate: childNextDueDate.toISOString(),
-            sm2_interval: existingData?.sm2_interval,
-            sm2_repetitions: existingData?.sm2_repetitions,
-            sm2_eFactor: existingData?.sm2_eFactor,
-            progressive_repetitions: progReps + 1,
-          },
-        };
-
-        const hasUnreadChildren = Object.keys(updatedProgress).length < childUidsList.length;
-
-        await updateLineByLineProgress({
-          refUid: currentCardRefUid,
+        const childPracticeProps = {
+          ...existingChildSession,
+          refUid: childUid,
           dataPageTitle,
-          progress: updatedProgress,
-          totalChildren: childUidsList.length,
+          algorithm,
+          interaction: InteractionStyle.NORMAL,
+          progressive_repetitions: progReps + 1,
+        };
+        const childResult = generatePracticeData({ ...childPracticeProps, dateCreated: now });
+
+        await savePracticeData({
+          refUid: childUid,
+          dataPageTitle,
+          dateCreated: now,
+          ...childResult,
         });
 
-        setSessionOverrides((prev) => ({
-          ...prev,
-          [currentCardRefUid]: {
-            ...currentCardData,
-            algorithm,
-            interaction,
-            dateCreated: now,
-            lbl_progress: JSON.stringify(updatedProgress),
-            nextDueDate: hasUnreadChildren ? now : childNextDueDate,
+        await updateParentNextDueDate({
+          refUid: currentCardRefUid,
+          childUids: childUidsList,
+          dataPageTitle,
+        });
+
+        setSessionOverrides((prev) => {
+          const updatedChildSessionData = {
+            ...prev[currentCardRefUid]?.childSessionData,
+            [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
+          };
+          return {
+            ...prev,
+            [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
+            [currentCardRefUid]: {
+              ...currentCardData,
+              algorithm,
+              interaction,
+              dateCreated: now,
+              nextDueDate: childNextDueDate,
+              childSessionData: updatedChildSessionData,
+            },
+          };
+        });
+
+        const nextDueIndex = findNextDueChildIndex(
+          childUidsList,
+          {
+            ...childSessionData,
+            [childUid]: { ...existingChildSession, ...childResult, nextDueDate: childNextDueDate },
           },
-        }));
+          lineByLineCurrentChildIndex + 1
+        );
 
         if (
           shouldReinsertLblCard({
@@ -189,54 +227,63 @@ export default function useLineByLineReview({
         }
 
         setCurrentIndex((prev) => prev + 1);
-        setLineByLineCurrentChildIndex(lineByLineCurrentChildIndex + 1);
-        setLineByLineRevealedCount(lineByLineCurrentChildIndex + 1);
+        setLineByLineCurrentChildIndex(nextDueIndex);
+        setLineByLineRevealedCount(nextDueIndex + 1);
         return;
       }
 
-      const existingData = lineByLineProgress[childUid];
-
       const sm2Input = {
-        sm2_interval: existingData?.sm2_interval || 0,
-        sm2_repetitions: existingData?.sm2_repetitions || 0,
-        sm2_eFactor: existingData?.sm2_eFactor || 2.5,
+        sm2_interval: existingChildSession.sm2_interval || 0,
+        sm2_repetitions: existingChildSession.sm2_repetitions || 0,
+        sm2_eFactor: existingChildSession.sm2_eFactor || 2.5,
       };
       const sm2Result = supermemo(sm2Input, grade);
-
-      const now = new Date();
       const childNextDueDate = dateUtils.addDays(now, sm2Result.sm2_interval);
 
-      const updatedProgress: LineByLineProgressMap = {
-        ...lineByLineProgress,
-        [childUid]: {
-          nextDueDate: childNextDueDate.toISOString(),
-          sm2_interval: sm2Result.sm2_interval,
-          sm2_repetitions: sm2Result.sm2_repetitions,
-          sm2_eFactor: sm2Result.sm2_eFactor,
-          progressive_repetitions: existingData?.progressive_repetitions,
-        },
-      };
-
-      const hasUnreadChildren = Object.keys(updatedProgress).length < childUidsList.length;
-
-      await updateLineByLineProgress({
-        refUid: currentCardRefUid,
+      const childPracticeProps = {
+        ...existingChildSession,
+        refUid: childUid,
         dataPageTitle,
-        progress: updatedProgress,
-        totalChildren: childUidsList.length,
+        algorithm,
+        interaction: InteractionStyle.NORMAL,
+        sm2_grade: grade,
+        sm2_interval: sm2Result.sm2_interval,
+        sm2_repetitions: sm2Result.sm2_repetitions,
+        sm2_eFactor: sm2Result.sm2_eFactor,
+      };
+      const childResult = generatePracticeData({ ...childPracticeProps, dateCreated: now });
+
+      await savePracticeData({
+        refUid: childUid,
+        dataPageTitle,
+        dateCreated: now,
+        ...childResult,
       });
 
-      setSessionOverrides((prev) => ({
-        ...prev,
-        [currentCardRefUid]: {
-          ...currentCardData,
-          algorithm,
-          interaction,
-          dateCreated: now,
-          lbl_progress: JSON.stringify(updatedProgress),
-          nextDueDate: hasUnreadChildren ? now : childNextDueDate,
-        },
-      }));
+      await updateParentNextDueDate({
+        refUid: currentCardRefUid,
+        childUids: childUidsList,
+        dataPageTitle,
+      });
+
+      setSessionOverrides((prev) => {
+        const updatedChildSessionData = {
+          ...prev[currentCardRefUid]?.childSessionData,
+          [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
+        };
+        return {
+          ...prev,
+          [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
+          [currentCardRefUid]: {
+            ...currentCardData,
+            algorithm,
+            interaction,
+            dateCreated: now,
+            nextDueDate: childNextDueDate,
+            childSessionData: updatedChildSessionData,
+          },
+        };
+      });
 
       if (grade === 0 && forgotReinsertOffset > 0 && currentCardRefUid) {
         const forgotInsertIndex = currentIndex + 1 + forgotReinsertOffset;
@@ -254,26 +301,34 @@ export default function useLineByLineReview({
         return;
       }
 
-      const nextIndex = lineByLineCurrentChildIndex + 1;
-      const isCardFinished = nextIndex >= childUidsList.length;
+      const updatedChildSessions = {
+        ...childSessionData,
+        [childUid]: { ...existingChildSession, ...childResult, nextDueDate: childNextDueDate },
+      };
+      const nextDueIndex = findNextDueChildIndex(
+        childUidsList,
+        updatedChildSessions,
+        lineByLineCurrentChildIndex + 1
+      );
+      const isCardFinished = nextDueIndex >= childUidsList.length;
 
       if (isCardFinished) {
         setCurrentIndex((prev) => prev + 1);
-        setLineByLineCurrentChildIndex(nextIndex);
-        setLineByLineRevealedCount(nextIndex);
+        setLineByLineCurrentChildIndex(nextDueIndex);
+        setLineByLineRevealedCount(nextDueIndex);
         setShowAnswers(false);
         return;
       }
 
-      setLineByLineCurrentChildIndex(nextIndex);
-      setLineByLineRevealedCount(nextIndex);
+      setLineByLineCurrentChildIndex(nextDueIndex);
+      setLineByLineRevealedCount(nextDueIndex);
       setShowAnswers(false);
     },
     [
       currentCardRefUid,
       lineByLineCurrentChildIndex,
       childUidsList,
-      lineByLineProgress,
+      childSessionData,
       dataPageTitle,
       setCurrentIndex,
       isLblNext,
@@ -298,7 +353,7 @@ export default function useLineByLineReview({
     lineByLineRevealedCount,
     lineByLineCurrentChildIndex,
     lineByLineIsCardComplete,
-    lineByLineProgress,
+    dueChildCount,
     onLineByLineGrade,
     onLineByLineShowAnswer,
   };

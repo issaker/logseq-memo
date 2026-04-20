@@ -236,7 +236,6 @@ describe('PracticeOverlay', () => {
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
       algorithm: SchedulingAlgorithm.PROGRESSIVE,
       interaction: InteractionStyle.LBL,
-      lbl_progress: JSON.stringify({}),
       sm2_grade: 1,
       dateCreated: dateUtils.subtractDays(new Date(), 1),
       nextDueDate: new Date(),
