@@ -208,11 +208,12 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
         }
       }
 
-      for (const child of todayBlock.children) {
-        if (child?.uid) {
-          await window.roamAlphaAPI.deleteBlock({ block: { uid: child.uid } });
-        }
-      }
+      // Promise.all: 并行删除子块，减少串行等待时间
+      await Promise.all(
+        todayBlock.children
+          .filter((child) => child?.uid)
+          .map((child) => window.roamAlphaAPI.deleteBlock({ block: { uid: child.uid } }))
+      );
     }
   } else {
     sessionBlockUid = await createChildBlock(
@@ -225,25 +226,21 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
 
   const nextDueDate = data.nextDueDate !== undefined ? data.nextDueDate : dateUtils.addDays(referenceDate, data.sm2_interval);
 
-  for (const key of Object.keys(data)) {
-    if (data[key] === undefined) continue;
-    // algorithm and interaction are written explicitly after the loop to ensure they
-    // always appear at the end of the session block. This way, when parseFieldValuesFromChildren
-    // parses them, later-written values overwrite earlier same-key values, guaranteeing the
-    // latest config takes effect (consistent with deduplicateSessionFields keeping the last entry).
-    if (key === 'algorithm') continue;
-    if (key === 'interaction') continue;
+  // Promise.all: 并行创建子块，减少串行等待时间
+  const fieldEntries = Object.keys(data)
+    .filter((key) => data[key] !== undefined && key !== 'algorithm' && key !== 'interaction')
+    .map((key) => {
+      let value = data[key];
+      if (key === 'nextDueDate') {
+        value = `[[${stringUtils.dateToRoamDateString(nextDueDate)}]]`;
+      }
+      if (key === 'sm2_eFactor' && typeof value === 'number') {
+        value = value.toFixed(2);
+      }
+      return createChildBlock(sessionBlockUid, `${key}:: ${value}`, -1);
+    });
 
-    let value = data[key];
-    if (key === 'nextDueDate') {
-      value = `[[${stringUtils.dateToRoamDateString(nextDueDate)}]]`;
-    }
-    if (key === 'sm2_eFactor' && typeof value === 'number') {
-      value = value.toFixed(2);
-    }
-
-    await createChildBlock(sessionBlockUid, `${key}:: ${value}`, -1);
-  }
+  await Promise.all(fieldEntries);
 
   if (data.algorithm) {
     await createChildBlock(sessionBlockUid, `algorithm:: ${data.algorithm}`, -1);

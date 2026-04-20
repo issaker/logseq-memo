@@ -49,7 +49,12 @@ function wrapMatches(node: Element, regex: RegExp) {
         textNode.parentNode.insertBefore(afterElm, textNode);
         textNode.parentNode.removeChild(textNode);
       }
-      textNodes = getAllTextNodes(node);
+      // 偏移更新：替换当前节点为 before + cloze + after，继续从 after 节点匹配
+      // 不再重新调用 getAllTextNodes，避免 O(N*M) 重复扫描
+      textNodes.splice(i, 1, beforeElm, afterElm);
+      // afterElm may contain more cloze marks, don't skip it
+      // beforeElm is guaranteed to have no more matches (before the match point)
+      i++; // skip beforeElm, check afterElm next
     } else {
       i++;
     }

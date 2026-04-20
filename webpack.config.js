@@ -23,7 +23,8 @@ module.exports = {
       export: 'default',
     },
   },
-  devtool: 'inline-source-map',
+  // 生产构建使用外部 source-map，开发模式使用 inline-source-map
+  devtool: process.env.NODE_ENV === 'production' ? 'source-map' : 'inline-source-map',
   module: {
     rules: [
       {

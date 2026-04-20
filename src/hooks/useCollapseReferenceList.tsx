@@ -42,9 +42,16 @@ const useCollapseReferenceList = ({ dataPageTitle }) => {
   }, [dataPageTitle, collapseDataReferenceBlock]);
 
   React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      collapseDataReferenceBlock();
-    });
+    // 防抖：防止 MutationObserver 回调触发的 DOM 变化再次触发观察者
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedCollapse = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        collapseDataReferenceBlock();
+      }, 300);
+    };
+
+    const observer = new MutationObserver(debouncedCollapse);
     (async () => {
       await asyncUtils.sleep(100);
       const dailyLogsContainerElm = document.querySelector('.roam-log-container');
@@ -54,6 +61,7 @@ const useCollapseReferenceList = ({ dataPageTitle }) => {
     })();
     return () => {
       observer.disconnect();
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [collapseDataReferenceBlock, currentRoute]);
 };

@@ -220,13 +220,19 @@ export const getDailyNoteBlockUids = async (): Promise<string[]> => {
     return [];
   }
 
-  const blockUids: string[] = [];
-  for (const pageUid of dailyNotePageUids) {
-    const blocks = window.roamAlphaAPI.q(pageTopLevelBlocksQuery, pageUid);
-    blockUids.push(...blocks.map((arr) => arr[0]));
-  }
-
-  return blockUids;
+  // 单次批量查询：替代逐页 N+1 查询模式
+  const allBlocksQuery = `
+    [:find ?blockUid
+     :in $ [?pageUid ...]
+     :where
+     [?page :block/uid ?pageUid]
+     [?page :block/children ?block]
+     [?block :block/uid ?blockUid]
+     [?block :block/string ?str]
+     [(not= ?str "")]]
+  `;
+  const results = window.roamAlphaAPI.q(allBlocksQuery, dailyNotePageUids);
+  return results.map((arr) => arr[0]);
 };
 
 export const createChildBlock = async (parent_uid, block, order, blockProps = {}) => {

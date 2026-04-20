@@ -5,6 +5,9 @@ import { colors } from '~/theme';
 import { Session } from '~/models/session';
 import useBlockInfo from '~/hooks/useBlockInfo';
 
+// 稳定引用：避免内联函数导致 React.memo 失效
+const NOOP = () => {};
+
 interface LineByLineViewProps {
   currentCardRefUid: string;
   childUidsList: string[];
@@ -54,7 +57,7 @@ const LineByLineView = ({
         setHasCloze={setHasCloze}
         breadcrumbs={blockInfo.breadcrumbs}
         showBreadcrumbs={showBreadcrumbs}
-        onRenderComplete={() => {}}
+        onRenderComplete={NOOP}
         hideChildren={true}
       />
       <LineByLineSeparator>
@@ -73,7 +76,7 @@ const LineByLineView = ({
               setHasCloze={setHasCloze}
               breadcrumbs={[]}
               showBreadcrumbs={false}
-              onRenderComplete={() => {}}
+              onRenderComplete={NOOP}
             />
           </LineByLineItem>
         );
@@ -105,4 +108,4 @@ const LineByLineItem = styled.div<{ $isCurrent: boolean; $isMastered: boolean }>
   opacity: ${(props) => (props.$isMastered && !props.$isCurrent ? 0.6 : 1)};
 `;
 
-export default LineByLineView;
+export default React.memo(LineByLineView);

@@ -70,16 +70,14 @@ export const getPracticeData = async ({
   const sessionData = {};
   const cardUids: Record<string, RecordUid[]> = {};
 
-  for (const tag of tagsList) {
-    const { sessionData: currentSessionData, cardUids: currentCardUids } = await getSessionData({
-      pluginPageData,
-      tag,
-      dataPageTitle,
-    });
-
-    sessionData[tag] = currentSessionData;
-    cardUids[tag] = currentCardUids;
-  }
+  // Promise.all: 并行查询多个 tag 的数据，减少串行等待时间
+  const results = await Promise.all(
+    tagsList.map((tag) => getSessionData({ pluginPageData, tag, dataPageTitle }))
+  );
+  tagsList.forEach((tag, i) => {
+    sessionData[tag] = results[i].sessionData;
+    cardUids[tag] = results[i].cardUids;
+  });
 
   calculateCompletedTodayCounts({ today, tagsList, sessionData });
 
@@ -431,13 +429,16 @@ export const getSessionData = async ({
 export const getChildSessionData = async ({
   childUids,
   dataPageTitle,
+  existingPluginPageData,
 }: {
   childUids: string[];
   dataPageTitle: string;
+  existingPluginPageData?: Records;
 }): Promise<Records> => {
   if (!childUids.length) return {};
 
-  const pluginPageData = (await getPluginPageData({
+  // 优先使用已缓存的数据，避免全量数据页重载
+  const pluginPageData = existingPluginPageData || (await getPluginPageData({
     dataPageTitle,
     limitToLatest: true,
   })) as Records;

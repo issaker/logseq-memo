@@ -36,6 +36,9 @@ const CardBlock = ({
   // Create a ref for the mutation observer
   const observerRef = React.useRef<MutationObserver | null>(null);
 
+  // 跟踪已注册 blur 监听器的 textarea，用于卸载时清理
+  const registeredTextareasRef = React.useRef<Set<HTMLTextAreaElement>>(new Set());
+
   // Update the ref when refUid changes
   React.useEffect(() => {
     refUidRef.current = refUid;
@@ -94,9 +97,10 @@ const CardBlock = ({
                 const newTextareas = node.querySelectorAll('textarea');
                 if (newTextareas.length > 0) {
                   newTextareas.forEach((textarea) => {
-                    textarea.removeEventListener('blur', handleBlockBlur);
-                    textarea.addEventListener('blur', handleBlockBlur);
-                  });
+                  textarea.removeEventListener('blur', handleBlockBlur);
+                  textarea.addEventListener('blur', handleBlockBlur);
+                  registeredTextareasRef.current.add(textarea);
+                });
                 }
               }
             });
@@ -118,7 +122,12 @@ const CardBlock = ({
     return () => {
       debouncedFnRef.current = null;
 
-      // Disconnect the mutation observer
+      // 清理已注册的 blur 事件监听器，防止内存泄漏
+      registeredTextareasRef.current.forEach((textarea) => {
+        textarea.removeEventListener('blur', handleBlockBlur);
+      });
+      registeredTextareasRef.current.clear();
+
       if (observerRef.current) {
         observerRef.current.disconnect();
         observerRef.current = null;
@@ -197,4 +206,4 @@ const BreadCrumbWrapper = styled.div`
   }
 `;
 
-export default CardBlock;
+export default React.memo(CardBlock);

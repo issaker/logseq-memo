@@ -7,10 +7,14 @@
 import * as React from 'react';
 
 const useOnVisibilityStateChange = (callback: () => void) => {
+  // useRef: 存储 callback 引用，避免 callback 变化导致事件监听器频繁重新注册
+  const callbackRef = React.useRef(callback);
+  callbackRef.current = callback;
+
   React.useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        callback();
+        callbackRef.current();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -18,7 +22,7 @@ const useOnVisibilityStateChange = (callback: () => void) => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [callback]);
+  }, []);
 };
 
 export default useOnVisibilityStateChange;

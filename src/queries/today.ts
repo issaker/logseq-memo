@@ -69,6 +69,8 @@ export const calculateTodayStatus = ({ today, tagsList }) => {
 export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) => {
   for (const tag of tagsList) {
     let count = 0;
+    // 循环外创建 Date：避免每次迭代重复创建对象
+    const now = new Date();
     const completedUids: RecordUid[] = [];
 
     const currentTagSessionData = sessionData[tag];
@@ -76,14 +78,10 @@ export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) 
       const cardData = currentTagSessionData[cardUid];
       if (cardData?.isNew) return;
       const isCompletedToday =
-        cardData && dateUtils.isSameDay(cardData.dateCreated, new Date());
+        cardData && dateUtils.isSameDay(cardData.dateCreated, now);
 
       if (isCompletedToday) {
         if (cardData.interaction === 'LBL') {
-          // LBL cards completed today but with nextDueDate still <= now are not counted
-          // as completed, because child blocks may not all be finished (nextDueDate is
-          // determined by the earliest-due child block)
-          const now = new Date();
           if (cardData.nextDueDate && cardData.nextDueDate <= now) return;
         }
 

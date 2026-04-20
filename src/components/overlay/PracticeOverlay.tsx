@@ -22,8 +22,32 @@ import useBlockInfo from '~/hooks/useBlockInfo';
 import * as asyncUtils from '~/utils/async';
 import * as dateUtils from '~/utils/date';
 import * as stringUtils from '~/utils/string';
-import Lottie from 'react-lottie';
-import doneAnimationData from '~/lotties/done.json';
+// 模块级常量：避免每次渲染重新创建对象
+const LOTTIE_STYLE = { height: 150, width: 'auto' as const, maxHeight: '40vh' };
+const LOTTIE_BASE_OPTIONS = {
+  loop: true,
+  autoplay: true,
+  rendererSettings: { preserveAspectRatio: 'xMidYMid meet' as const },
+};
+
+// 懒加载：Lottie 仅在 isDone 状态时使用，避免增加初始 bundle 体积
+const LazyDoneAnimation = React.lazy(() =>
+  Promise.all([
+    // @ts-expect-error tsconfig module=es6 不支持 dynamic import，但 webpack 支持
+    import('react-lottie'),
+    // @ts-expect-error tsconfig module=es6 不支持 dynamic import，但 webpack 支持
+    import('~/lotties/done.json'),
+  ]).then(([lottieModule, animationData]) => {
+    const LottieComponent = lottieModule.default;
+    const DoneAnimation = () => (
+      <LottieComponent
+        options={{ ...LOTTIE_BASE_OPTIONS, animationData: animationData.default }}
+        style={LOTTIE_STYLE}
+      />
+    );
+    return { default: DoneAnimation };
+  })
+);
 import mediaQueries from '~/utils/mediaQueries';
 
 import CardBlock from '~/components/overlay/CardBlock';
@@ -67,6 +91,9 @@ interface MainContextProps {
   cardMeta: import('~/models/session').CardMeta | undefined;
   baseCardData: Session | undefined;
 }
+
+// 稳定引用：避免内联函数导致 React.memo 失效
+const NOOP = () => {};
 
 export const MainContext = React.createContext<MainContextProps>({} as MainContextProps);
 
@@ -418,20 +445,6 @@ const PracticeOverlay = ({
     setCurrentIndex(0);
   };
 
-  const lottieAnimationOption = {
-    loop: true,
-    autoplay: true,
-    animationData: doneAnimationData,
-    rendererSettings: {
-      preserveAspectRatio: 'xMidYMid meet',
-    },
-  };
-  const lottieStyle = {
-    height: 150,
-    width: 'auto',
-    maxHeight: '40vh',
-  };
-
   const toggleBreadcrumbs = React.useCallback(() => {
     updateSetting('showBreadcrumbs', !showBreadcrumbs);
   }, [showBreadcrumbs, updateSetting]);
@@ -459,6 +472,7 @@ const PracticeOverlay = ({
 
   // Detect editing state and adjust bottom spacing
   const [isEditing, setIsEditing] = React.useState(false);
+  const isMountedRef = React.useRef(true);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -475,7 +489,9 @@ const PracticeOverlay = ({
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         // Small delay to check if another input gets focus
+        // 卸载保护：防止组件卸载后执行状态更新
         setTimeout(() => {
+          if (!isMountedRef.current) return;
           const activeElement = document.activeElement;
           if (
             !activeElement ||
@@ -491,6 +507,7 @@ const PracticeOverlay = ({
     document.addEventListener('focusout', handleFocusOut);
 
     return () => {
+      isMountedRef.current = false;
       document.removeEventListener('focusin', handleFocusIn);
       document.removeEventListener('focusout', handleFocusOut);
     };
@@ -576,38 +593,44 @@ const PracticeOverlay = ({
     ]
   );
 
+  // useMemo: 稳定引用避免消费 PracticeSessionContext 的子组件不必要重渲染
+  const sessionContextValue = React.useMemo(() => ({
+    ...sessionContext,
+    algorithm,
+    interaction,
+    onSelectAlgorithm,
+    onSelectInteraction,
+  }), [sessionContext, algorithm, interaction, onSelectAlgorithm, onSelectInteraction]);
+
+  // useMemo: 稳定引用避免消费 MainContext 的子组件不必要重渲染
+  const mainContextValue = React.useMemo(() => ({
+    fixed_multiplier,
+    setFixed_multiplier,
+    fixed_unit,
+    setFixed_unit,
+    onPracticeClick,
+    currentIndex,
+    renderMode,
+    isLineByLine: isLineByLineActive,
+    lineByLineCurrentIndex: isLineByLineActive ? lineByLineCurrentChildIndex + 1 : 0,
+    lineByLineTotal: isLineByLineActive ? childUidsList.length : 0,
+    lineByLineDueCount: isLineByLineActive ? dueChildCount : 0,
+    cardMeta,
+    baseCardData,
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardMeta, baseCardData]);
+
   if (!todaySelectedTag) {
     return null;
   }
 
   return (
     <PracticeSessionContext.Provider
-      value={{
-        ...sessionContext,
-        algorithm,
-        interaction,
-        onSelectAlgorithm,
-        onSelectInteraction,
-      }}
+      value={sessionContextValue}
     >
     <MainContext.Provider
-      value={{
-        fixed_multiplier,
-        setFixed_multiplier,
-        fixed_unit,
-        setFixed_unit,
-        onPracticeClick,
-        currentIndex,
-        renderMode,
-        isLineByLine: isLineByLineActive,
-        lineByLineCurrentIndex: isLineByLineActive ? lineByLineCurrentChildIndex + 1 : 0,
-        lineByLineTotal: isLineByLineActive ? childUidsList.length : 0,
-        lineByLineDueCount: isLineByLineActive ? dueChildCount : 0,
-        cardMeta,
-        baseCardData,
-      }}
+      value={mainContextValue}
     >
-      <style>{mobileOverlayStyles()}</style>
+      <style>{MOBILE_OVERLAY_STYLES}</style>
       <Dialog
         $isEditing={isEditing}
         $algorithm={algorithm}
@@ -653,7 +676,7 @@ const PracticeOverlay = ({
                     setHasCloze={setHasCloze}
                     breadcrumbs={blockInfo.breadcrumbs}
                     showBreadcrumbs={false}
-                    onRenderComplete={() => {}}
+                    onRenderComplete={NOOP}
                   />
                 ))
               ) : (
@@ -663,13 +686,15 @@ const PracticeOverlay = ({
                   setHasCloze={setHasCloze}
                   breadcrumbs={blockInfo.breadcrumbs}
                   showBreadcrumbs={showBreadcrumbs}
-                  onRenderComplete={() => {}}
+                  onRenderComplete={NOOP}
                 />
               )}
             </>
           ) : (
             <div data-testid="practice-overlay-done-state" className="flex items-center flex-col">
-              <Lottie options={lottieAnimationOption} style={lottieStyle} />
+              <React.Suspense fallback={null}>
+                <LazyDoneAnimation />
+              </React.Suspense>
               <div>
                 You&apos;re all caught up! 🌟{' '}
                 {todaySelectedTag.completed > 0
@@ -754,7 +779,8 @@ const Dialog = styled(Blueprint.Dialog)<{
   }
 `;
 
-const mobileOverlayStyles = () => `
+// 静态 CSS 常量：不依赖组件状态，避免每次渲染重新生成
+const MOBILE_OVERLAY_STYLES = `
   @media (max-width: 768px) {
     /* Mobile: Make backdrop transparent and clickable-through */
     .bp3-overlay.bp3-overlay-open > .bp3-overlay-backdrop {
