@@ -23,19 +23,28 @@ const SETTINGS_BLOCK_NAME = 'settings';
  * block, because setting blocks are simple key:: value strings and the
  * delete+create pattern avoids UID tracking complexity.
  */
-/** Save all settings to the data page (delete-then-create per key) */
+/** Save all settings to the data page (full rewrite: delete all children then create) */
 export const saveSettingsToPage = async (dataPageTitle: string, settings: Settings) => {
   try {
-    // Ensure the data page exists
     await getOrCreatePage(dataPageTitle);
-    
-    // Get or create the settings block
+
     const settingsBlockUid = await getOrCreateBlockOnPage(dataPageTitle, SETTINGS_BLOCK_NAME, -1, {
       open: false,
       heading: 3,
     });
 
-    // Save each setting as a child block
+    const existingChildren = await window.roamAlphaAPI.q(
+      `[:find ?child-uid
+        :where
+        [?parent :block/uid "${settingsBlockUid}"]
+        [?child :block/parents ?parent]
+        [?child :block/uid ?child-uid]]`
+    );
+
+    for (const [uid] of existingChildren) {
+      await window.roamAlphaAPI.deleteBlock({ block: { uid } });
+    }
+
     const settingsToSave = {
       tagsListString: settings.tagsListString,
       dataPageTitle: settings.dataPageTitle,
@@ -51,28 +60,13 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
     };
 
     for (const [key, value] of Object.entries(settingsToSave)) {
-      try {
-        // Delete existing block if it exists
-        const existingBlockUid = await getChildBlock(settingsBlockUid, `${key}::`, {
-          exactMatch: false,
-        });
-        
-        if (existingBlockUid) {
-          await window.roamAlphaAPI.deleteBlock({ block: { uid: existingBlockUid } });
-        }
-
-        // Create new block with updated value
-        await window.roamAlphaAPI.createBlock({
-          location: { 'parent-uid': settingsBlockUid, order: -1 },
-          block: {
-            string: `${key}:: ${value}`,
-            open: false,
-          },
-        });
-      } catch (err) {
-        console.error(`Memo: Failed to save setting ${key}`, err);
-        throw err; // Re-throw to be caught by outer try-catch
-      }
+      await window.roamAlphaAPI.createBlock({
+        location: { 'parent-uid': settingsBlockUid, order: -1 },
+        block: {
+          string: `${key}:: ${value}`,
+          open: false,
+        },
+      });
     }
 
     return true;
@@ -104,25 +98,27 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
     // Query for all child blocks of the settings block
     // Use a simple query that doesn't pass UIDs as parameters in lookup ref position
     const childrenQuery = `
-      [:find ?child-uid ?child-string
+      [:find ?child-uid ?child-string ?child-create-time
        :where
        [?parent :block/uid "${settingsBlockUid}"]
        [?child :block/parents ?parent]
        [?child :block/uid ?child-uid]
        [?child :block/string ?child-string]
+       [?child :block/create-time ?child-create-time]
       ]
     `;
-    
+
     const results = window.roamAlphaAPI.q(childrenQuery);
-    
+
     if (!results || results.length === 0) {
       return null;
     }
 
+    const sortedResults = results.sort((a, b) => a[2] - b[2]);
+
     const loadedSettings: Partial<Settings> = {};
-    
-    // Parse each setting
-    for (const [blockUid, blockString] of results) {
+
+    for (const [blockUid, blockString] of sortedResults) {
       try {
         if (blockString && blockString.includes('::')) {
           const [keyPart, ...valueParts] = blockString.split('::');
