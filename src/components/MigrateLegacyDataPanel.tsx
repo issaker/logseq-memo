@@ -231,6 +231,7 @@ interface MigrationTask {
   metaBlockUid?: string;
   metaFields: Record<string, { uid: string; value: string }>;
   latestSessionBlockUid?: string;
+  hasExistingAlgorithm: boolean;
 }
 
 const scanReviewModeFields = (cardChildren: any[] = []): ReviewModeFieldInfo[] => {
@@ -507,6 +508,8 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
           }
         }
 
+        const { hasAlgorithm: hasExistingAlgorithm } = hasAlgorithmInteractionFields(rawCardChildren);
+
         tasks.push({
           cardUid,
           needsCardTypeRename,
@@ -521,6 +524,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
           metaBlockUid: metaBlock?.uid,
           metaFields,
           latestSessionBlockUid: latestSessionBlock?.uid,
+          hasExistingAlgorithm,
         });
       }
 
@@ -554,10 +558,10 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
             await updateReviewConfig({
               refUid: task.cardUid,
               dataPageTitle,
-              algorithm: config?.algorithm,
+              algorithm: task.hasExistingAlgorithm ? undefined : config?.algorithm,
               interaction: config?.interaction,
             });
-            debugLog(`[Memo] Phase 1: card ${task.cardUid} — wrote reviewMode (mode=${task.resolvedMode})`);
+            debugLog(`[Memo] Phase 1: card ${task.cardUid} — wrote reviewMode (mode=${task.resolvedMode}, algorithmPreserved=${task.hasExistingAlgorithm})`);
           }
 
           if (task.needsDuplicateCleanup && task.duplicateBlockUids.length > 0) {
@@ -1172,7 +1176,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                   const now = new Date();
                   const dateStr = window.roamAlphaAPI.util.dateToPageTitle(now);
 
-                  const algorithm = sessionData.algorithm || 'SM2';
+                  const algorithm = sessionData.algorithm || SchedulingAlgorithm.PROGRESSIVE;
 
                   await window.roamAlphaAPI.createBlock({
                     location: { 'parent-uid': lblDataBlock.uid, order: -1 },
