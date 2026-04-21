@@ -235,7 +235,7 @@ const PracticeOverlay = ({
   const isDueToday = nextDueDate ? dateUtils.daysBetween(nextDueDate, new Date()) === 0 : false;
   const status = isNew ? 'new' : isDueToday ? 'dueToday' : hasNextDueDate ? 'pastDue' : null;
 
-  const { blockInfo } = useBlockInfo({ refUid: currentCardRefUid });
+  const { blockInfo } = useBlockInfo({ refUid: currentCardRefUid, refreshKey: interaction });
   const hasBlockChildren = !!blockInfo.children && !!blockInfo.children.length;
   const hasBlockChildrenUids = !!blockInfo.childrenUids && !!blockInfo.childrenUids.length;
 
@@ -303,6 +303,13 @@ const PracticeOverlay = ({
     setCardQueue,
     childSessionData,
   });
+
+  const effectiveBaseCardData = React.useMemo(() => {
+    if (!isLineByLineActive) return baseCardData;
+    const currentChildUid = childUidsList[lineByLineCurrentChildIndex];
+    if (!currentChildUid) return baseCardData;
+    return childSessionData[currentChildUid] || generateNewSession({ algorithm });
+  }, [isLineByLineActive, baseCardData, childUidsList, lineByLineCurrentChildIndex, childSessionData, algorithm]);
 
   React.useEffect(() => {
     const effectiveInteraction = (latestSession?.interaction || interaction) as InteractionStyle | undefined;
@@ -621,8 +628,8 @@ const PracticeOverlay = ({
     lineByLineTotal: isLineByLineActive ? childUidsList.length : 0,
     lineByLineDueCount: isLineByLineActive ? dueChildCount : 0,
     cardMeta,
-    baseCardData,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardMeta, baseCardData]);
+    baseCardData: effectiveBaseCardData,
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardMeta, effectiveBaseCardData]);
 
   if (!todaySelectedTag) {
     return null;

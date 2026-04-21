@@ -7,7 +7,7 @@
 import * as React from 'react';
 import { BlockInfo, fetchBlockInfo } from '~/queries';
 
-const useBlockInfo = ({ refUid }) => {
+const useBlockInfo = ({ refUid, refreshKey }: { refUid: any; refreshKey?: any }) => {
   const [blockInfo, setBlockInfo] = React.useState<BlockInfo>({} as BlockInfo);
 
   React.useEffect(() => {
@@ -19,7 +19,7 @@ const useBlockInfo = ({ refUid }) => {
     };
 
     fetch();
-  }, [refUid]);
+  }, [refUid, refreshKey]);
 
   return { blockInfo };
 };
