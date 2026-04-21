@@ -320,19 +320,16 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
       const LEGACY_FIELD_NAMES = new Set([
         'progressiveRepetitions', 'progressiveInterval', 'intervalMultiplier',
         'intervalMultiplierType', 'repetitions', 'interval', 'eFactor', 'grade',
-        'lineByLineReview',
+        'lineByLineReview', 'lbl_progress',
       ]);
 
       const hasLegacyFieldNames = (cardChildren: any[] = []): boolean => {
-        for (const child of cardChildren) {
-          if (!child?.children) continue;
-          for (const sessionBlock of child.children) {
-            if (!sessionBlock?.children) continue;
-            for (const field of sessionBlock.children) {
-              if (!field?.string) continue;
-              const [key] = parseConfigString(field.string);
-              if (LEGACY_FIELD_NAMES.has(key)) return true;
-            }
+        for (const sessionBlock of cardChildren) {
+          if (!sessionBlock?.children) continue;
+          for (const field of sessionBlock.children) {
+            if (!field?.string) continue;
+            const [key] = parseConfigString(field.string);
+            if (LEGACY_FIELD_NAMES.has(key)) return true;
           }
         }
         return false;
