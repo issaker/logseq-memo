@@ -22,7 +22,21 @@ import useBlockInfo from '~/hooks/useBlockInfo';
 import * as asyncUtils from '~/utils/async';
 import * as dateUtils from '~/utils/date';
 import * as stringUtils from '~/utils/string';
-// 模块级常量：避免每次渲染重新创建对象
+
+class DoneAnimationErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
 const LOTTIE_STYLE = { height: 150, width: 'auto' as const, maxHeight: '40vh' };
 const LOTTIE_BASE_OPTIONS = {
   loop: true,
@@ -30,23 +44,14 @@ const LOTTIE_BASE_OPTIONS = {
   rendererSettings: { preserveAspectRatio: 'xMidYMid meet' as const },
 };
 
-// 懒加载：Lottie 仅在 isDone 状态时使用，避免增加初始 bundle 体积
-const LazyDoneAnimation = React.lazy(() =>
-  Promise.all([
-    // @ts-expect-error tsconfig module=es6 不支持 dynamic import，但 webpack 支持
-    import('react-lottie'),
-    // @ts-expect-error tsconfig module=es6 不支持 dynamic import，但 webpack 支持
-    import('~/lotties/done.json'),
-  ]).then(([lottieModule, animationData]) => {
-    const LottieComponent = lottieModule.default;
-    const DoneAnimation = () => (
-      <LottieComponent
-        options={{ ...LOTTIE_BASE_OPTIONS, animationData: animationData.default }}
-        style={LOTTIE_STYLE}
-      />
-    );
-    return { default: DoneAnimation };
-  })
+import Lottie from 'react-lottie';
+import doneAnimationData from '~/lotties/done.json';
+
+const DoneAnimation = () => (
+  <Lottie
+    options={{ ...LOTTIE_BASE_OPTIONS, animationData: doneAnimationData }}
+    style={LOTTIE_STYLE}
+  />
 );
 import mediaQueries from '~/utils/mediaQueries';
 
@@ -692,9 +697,9 @@ const PracticeOverlay = ({
             </>
           ) : (
             <div data-testid="practice-overlay-done-state" className="flex items-center flex-col">
-              <React.Suspense fallback={null}>
-                <LazyDoneAnimation />
-              </React.Suspense>
+              <DoneAnimationErrorBoundary>
+                <DoneAnimation />
+              </DoneAnimationErrorBoundary>
               <div>
                 You&apos;re all caught up! 🌟{' '}
                 {todaySelectedTag.completed > 0

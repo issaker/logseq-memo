@@ -1092,7 +1092,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
               const cardUid = cardUidMatch[1];
 
               const sessionData = lblPluginPageData[cardUid] as any;
-              if (!sessionData || sessionData.interaction !== 'LBL') {
+              if (!sessionData) {
                 phase6Skipped++;
                 continue;
               }
@@ -1111,6 +1111,26 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
               if (!lblProgressValue) {
                 phase6Skipped++;
+                continue;
+              }
+
+              if (sessionData.interaction !== 'LBL') {
+                for (const sessionBlock of sessionBlocks) {
+                  if (!sessionBlock.children) continue;
+                  for (const fieldBlock of sessionBlock.children) {
+                    const [key] = parseConfigString(fieldBlock.string || '');
+                    if (key === 'lbl_progress' || key === 'lineByLineProgress') {
+                      try {
+                        await window.roamAlphaAPI.deleteBlock({ block: { uid: fieldBlock.uid } });
+                        phase6Migrated++;
+                      } catch (err) {
+                        console.error(`[Memo] Phase 6 delete lbl_progress error for card ${cardUid}:`, err);
+                        errMsgs.push(`Phase 6 delete lbl_progress card ${cardUid}: ${err instanceof Error ? err.message : String(err)}`);
+                        phase6Errors++;
+                      }
+                    }
+                  }
+                }
                 continue;
               }
 
