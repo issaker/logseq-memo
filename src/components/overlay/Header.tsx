@@ -247,7 +247,7 @@ const StatusBadge = ({ status, nextDueDate, isCramming }) => {
   }
 };
 
-const ModeBadge = ({ algorithm, interaction }: { algorithm?: SchedulingAlgorithm; interaction?: InteractionStyle }) => {
+const ModeBadge = ({ algorithm, interaction, lblProgress }: { algorithm?: SchedulingAlgorithm; interaction?: InteractionStyle; lblProgress?: { current: number; total: number; due: number } }) => {
   if (!algorithm && !interaction) return null;
 
   const algoMeta = algorithm ? ALGORITHM_META[algorithm] : undefined;
@@ -264,7 +264,9 @@ const ModeBadge = ({ algorithm, interaction }: { algorithm?: SchedulingAlgorithm
       )}
       {interactionLabel && interaction !== InteractionStyle.NORMAL && (
         <Blueprint.Tag intent="none" minimal style={{ marginLeft: '2px' }}>
-          {interactionLabel === 'Line by Line' ? 'LBL' : interactionLabel}
+          {interaction === InteractionStyle.LBL && lblProgress
+            ? `LBL ${lblProgress.current}/${lblProgress.total} (${lblProgress.due} due)`
+            : interactionLabel === 'Line by Line' ? 'LBL' : interactionLabel}
         </Blueprint.Tag>
       )}
     </>
@@ -314,10 +316,11 @@ const Header = ({
     lineByLineCurrentIndex,
     lineByLineTotal,
     lineByLineDueCount,
+    cardQueueLength,
   } = useSafeContext(MainContext);
   const todaySelectedTag = today.tags[selectedTag];
   const completedTodayCount = todaySelectedTag.completed;
-  const remainingTodayCount = todaySelectedTag.due + todaySelectedTag.new;
+  const remainingTodayCount = isCramming ? cardQueueLength : completedTodayCount + cardQueueLength;
 
   const currentIndexDelta = isCramming ? 0 : completedTodayCount;
   const currentDisplayCount = currentIndexDelta + currentIndex + 1;
@@ -335,11 +338,6 @@ const Header = ({
         </div>
       </div>
       <div className="flex items-center justify-end">
-        {isLineByLine && !isDone && (
-          <Blueprint.Tag intent="none" minimal style={{ fontSize: '10px', marginRight: '4px' }} className="mobile-hide">
-            L{lineByLineCurrentIndex}/{lineByLineTotal} ({lineByLineDueCount} due)
-          </Blueprint.Tag>
-        )}
         {!isDone && (
           <div onClick={toggleBreadcrumbs} className="px-1 cursor-pointer">
             <Tooltip
@@ -358,7 +356,7 @@ const Header = ({
             <Blueprint.Icon icon="cog" />
           </Tooltip>
         </div>
-        <span data-testid="mode-badge" className="mobile-hide">{!isDone && <ModeBadge algorithm={algorithm} interaction={interaction} />}</span>
+        <span data-testid="mode-badge" className="mobile-hide">{!isDone && <ModeBadge algorithm={algorithm} interaction={interaction} lblProgress={isLineByLine ? { current: lineByLineCurrentIndex, total: lineByLineTotal, due: lineByLineDueCount } : undefined} />}</span>
         <span data-testid="status-badge" className="mobile-hide">
           <StatusBadge
             status={status}

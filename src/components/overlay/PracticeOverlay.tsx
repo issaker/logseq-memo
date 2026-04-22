@@ -94,6 +94,7 @@ interface MainContextProps {
   lineByLineCurrentIndex: number;
   lineByLineTotal: number;
   lineByLineDueCount: number;
+  cardQueueLength: number;
   cardMeta: import('~/models/session').CardMeta | undefined;
   baseCardData: Session | undefined;
 }
@@ -636,9 +637,10 @@ const PracticeOverlay = ({
     lineByLineCurrentIndex: isLineByLineActive ? lineByLineCurrentChildIndex + 1 : 0,
     lineByLineTotal: isLineByLineActive ? childUidsList.length : 0,
     lineByLineDueCount: isLineByLineActive ? dueChildCount : 0,
+    cardQueueLength: cardQueue.length,
     cardMeta,
     baseCardData: effectiveBaseCardData,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardMeta, effectiveBaseCardData]);
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData]);
 
   if (!todaySelectedTag) {
     return null;
