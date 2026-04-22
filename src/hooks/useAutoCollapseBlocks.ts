@@ -4,9 +4,6 @@ import { collapseBlockOnPage } from '~/utils/dom';
 interface UseAutoCollapseBlocksInput {
   enabled: boolean;
   currentCardRefUid: string | undefined;
-  isLineByLineActive: boolean;
-  childUidsList: string[];
-  lineByLineCurrentChildIndex: number;
   lineByLineIsCardComplete: boolean;
   isOpen: boolean;
 }
@@ -14,15 +11,11 @@ interface UseAutoCollapseBlocksInput {
 export default function useAutoCollapseBlocks({
   enabled,
   currentCardRefUid,
-  isLineByLineActive,
-  childUidsList,
-  lineByLineCurrentChildIndex,
   lineByLineIsCardComplete,
   isOpen,
 }: UseAutoCollapseBlocksInput) {
   const expandedBlockUidsRef = React.useRef<Set<string>>(new Set());
   const prevCardRefUidRef = React.useRef<string | undefined>();
-  const prevChildIndexRef = React.useRef<number>(0);
   const isMountedRef = React.useRef(true);
 
   React.useEffect(() => {
@@ -48,28 +41,6 @@ export default function useAutoCollapseBlocks({
       }, 300);
     }
   }, [enabled, currentCardRefUid]);
-
-  React.useEffect(() => {
-    if (!enabled || !isLineByLineActive) {
-      prevChildIndexRef.current = lineByLineCurrentChildIndex;
-      return;
-    }
-    const prevIndex = prevChildIndexRef.current;
-    prevChildIndexRef.current = lineByLineCurrentChildIndex;
-    if (lineByLineCurrentChildIndex > prevIndex) {
-      for (let i = prevIndex; i < lineByLineCurrentChildIndex; i++) {
-        const uid = childUidsList[i];
-        if (uid) {
-          expandedBlockUidsRef.current.add(uid);
-          const collapseUid = uid;
-          setTimeout(() => {
-            if (!isMountedRef.current) return;
-            collapseBlockOnPage(collapseUid);
-          }, 300);
-        }
-      }
-    }
-  }, [enabled, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList]);
 
   React.useEffect(() => {
     if (!enabled || !lineByLineIsCardComplete || !currentCardRefUid) return;

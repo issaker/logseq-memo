@@ -309,9 +309,6 @@ const PracticeOverlay = ({
   useAutoCollapseBlocks({
     enabled: autoCollapseBlocks,
     currentCardRefUid,
-    isLineByLineActive,
-    childUidsList,
-    lineByLineCurrentChildIndex,
     lineByLineIsCardComplete,
     isOpen,
   });
@@ -690,6 +687,7 @@ const PracticeOverlay = ({
                   childSessionData={childSessionData}
                   setHasCloze={setHasCloze}
                   showBreadcrumbs={showBreadcrumbs}
+                  autoCollapseBlocks={autoCollapseBlocks}
                 />
               ) : shouldShowAnswerFirst ? (
                 blockInfo.childrenUids?.map((uid) => (

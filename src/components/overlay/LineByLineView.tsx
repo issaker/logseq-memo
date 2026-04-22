@@ -16,6 +16,7 @@ interface LineByLineViewProps {
   childSessionData: Record<string, Session>;
   setHasCloze: (hasCloze: boolean) => void;
   showBreadcrumbs: boolean;
+  autoCollapseBlocks: boolean;
 }
 
 const getDueChildCount = (
@@ -41,6 +42,7 @@ const LineByLineView = ({
   childSessionData,
   setHasCloze,
   showBreadcrumbs,
+  autoCollapseBlocks,
 }: LineByLineViewProps) => {
   const { blockInfo } = useBlockInfo({ refUid: currentCardRefUid });
 
@@ -77,7 +79,7 @@ const LineByLineView = ({
               breadcrumbs={[]}
               showBreadcrumbs={false}
               onRenderComplete={NOOP}
-              hideChildren={!isCurrentLine}
+              autoExpand={isCurrentLine || !autoCollapseBlocks}
             />
           </LineByLineItem>
         );

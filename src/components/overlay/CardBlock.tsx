@@ -15,6 +15,7 @@ const CardBlock = ({
   showBreadcrumbs,
   onRenderComplete,
   hideChildren,
+  autoExpand = true,
 }: {
   refUid: string;
   showAnswers: boolean;
@@ -23,6 +24,7 @@ const CardBlock = ({
   showBreadcrumbs: boolean;
   onRenderComplete?: () => void;
   hideChildren?: boolean;
+  autoExpand?: boolean;
 }) => {
   const ref = React.useRef<HTMLDivElement | null>(null);
   const [renderedBlockElm, setRenderedBlockElm] = React.useState<HTMLElement | null>(null);
@@ -30,19 +32,20 @@ const CardBlock = ({
 
   const [forceUpdate, setForceUpdate] = React.useState(0);
 
-  // Store the current refUid in a ref to access it inside the debounced function
   const refUidRef = React.useRef(refUid);
+  const autoExpandRef = React.useRef(autoExpand);
 
-  // Create a ref for the mutation observer
   const observerRef = React.useRef<MutationObserver | null>(null);
 
-  // 跟踪已注册 blur 监听器的 textarea，用于卸载时清理
   const registeredTextareasRef = React.useRef<Set<HTMLTextAreaElement>>(new Set());
 
-  // Update the ref when refUid changes
   React.useEffect(() => {
     refUidRef.current = refUid;
   }, [refUid]);
+
+  React.useEffect(() => {
+    autoExpandRef.current = autoExpand;
+  }, [autoExpand]);
 
   // Create a ref to store the debounced function
   const debouncedFnRef = React.useRef<(() => void) | null>(null);
@@ -69,18 +72,18 @@ const CardBlock = ({
       await window.roamAlphaAPI.ui.components.unmountNode({ el: ref.current });
       await window.roamAlphaAPI.ui.components.renderBlock({ uid: currentRefUid, el: ref.current });
 
-      // Ensure block is not collapsed (so we can reveal children programatically)
       const roamBlockElm = ref.current.querySelector('.rm-block') as HTMLElement | null;
       setRenderedBlockElm(roamBlockElm);
       const isCollapsed = roamBlockElm?.classList.contains('rm-block--closed');
-      if (isCollapsed) {
-        // Currently no Roam API to toggle block collapse, so had to find this hacky
-        // way to do it by simulating click
+      if (autoExpandRef.current && isCollapsed) {
         const expandControlBtn = ref.current.querySelector('.block-expand .rm-caret');
-
         domUtils.simulateMouseClick(expandControlBtn);
         await asyncUtils.sleep(100);
         domUtils.simulateMouseClick(expandControlBtn);
+      } else if (!autoExpandRef.current && !isCollapsed) {
+        await window.roamAlphaAPI.updateBlock({
+          block: { uid: currentRefUid, open: false },
+        });
       }
 
       // Disconnect any existing observer
@@ -140,7 +143,7 @@ const CardBlock = ({
     if (debouncedFnRef.current) {
       debouncedFnRef.current();
     }
-  }, [refUid, forceUpdate]);
+  }, [refUid, forceUpdate, autoExpand]);
 
   return (
     <div>
