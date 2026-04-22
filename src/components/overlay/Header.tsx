@@ -247,7 +247,7 @@ const StatusBadge = ({ status, nextDueDate, isCramming }) => {
   }
 };
 
-const ModeBadge = ({ algorithm, interaction, lblProgress }: { algorithm?: SchedulingAlgorithm; interaction?: InteractionStyle; lblProgress?: { current: number; total: number; due: number } }) => {
+const ModeBadge = ({ algorithm, interaction }: { algorithm?: SchedulingAlgorithm; interaction?: InteractionStyle }) => {
   if (!algorithm && !interaction) return null;
 
   const algoMeta = algorithm ? ALGORITHM_META[algorithm] : undefined;
@@ -264,9 +264,7 @@ const ModeBadge = ({ algorithm, interaction, lblProgress }: { algorithm?: Schedu
       )}
       {interactionLabel && interaction !== InteractionStyle.NORMAL && (
         <Blueprint.Tag intent="none" minimal style={{ marginLeft: '2px' }}>
-          {interaction === InteractionStyle.LBL && lblProgress
-            ? `LBL ${lblProgress.current}/${lblProgress.total} (${lblProgress.due} due)`
-            : interactionLabel === 'Line by Line' ? 'LBL' : interactionLabel}
+          {interactionLabel === 'Line by Line' ? 'LBL' : interactionLabel}
         </Blueprint.Tag>
       )}
     </>
@@ -312,10 +310,6 @@ const Header = ({
   const { showBreadcrumbs } = settings;
   const {
     currentIndex,
-    isLineByLine,
-    lineByLineCurrentIndex,
-    lineByLineTotal,
-    lineByLineDueCount,
     cardQueueLength,
   } = useSafeContext(MainContext);
   const todaySelectedTag = today.tags[selectedTag];
@@ -356,7 +350,7 @@ const Header = ({
             <Blueprint.Icon icon="cog" />
           </Tooltip>
         </div>
-        <span data-testid="mode-badge" className="mobile-hide">{!isDone && <ModeBadge algorithm={algorithm} interaction={interaction} lblProgress={isLineByLine ? { current: lineByLineCurrentIndex, total: lineByLineTotal, due: lineByLineDueCount } : undefined} />}</span>
+        <span data-testid="mode-badge" className="mobile-hide">{!isDone && <ModeBadge algorithm={algorithm} interaction={interaction} />}</span>
         <span data-testid="status-badge" className="mobile-hide">
           <StatusBadge
             status={status}
