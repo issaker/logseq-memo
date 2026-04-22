@@ -24,7 +24,13 @@ export const simulateMouseClick = (element) => {
 };
 
 export const collapseBlockOnPage = (uid: string) => {
-  return window.roamAlphaAPI.updateBlock({
-    block: { uid, open: false },
-  });
+  const textareas = Array.from(document.querySelectorAll(`textarea[id="${uid}"]`));
+  for (const textarea of textareas) {
+    if (textarea.closest('[role="dialog"]')) continue;
+    const blockContainer = textarea.closest('.rm-block-container');
+    if (!blockContainer) continue;
+    const caret = blockContainer.querySelector('.rm-caret-open');
+    if (caret) simulateMouseClick(caret);
+    break;
+  }
 };

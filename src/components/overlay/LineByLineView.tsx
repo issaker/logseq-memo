@@ -5,7 +5,6 @@ import { colors } from '~/theme';
 import { Session } from '~/models/session';
 import useBlockInfo from '~/hooks/useBlockInfo';
 
-// 稳定引用：避免内联函数导致 React.memo 失效
 const NOOP = () => {};
 
 interface LineByLineViewProps {
@@ -16,7 +15,6 @@ interface LineByLineViewProps {
   childSessionData: Record<string, Session>;
   setHasCloze: (hasCloze: boolean) => void;
   showBreadcrumbs: boolean;
-  autoCollapseBlocks: boolean;
 }
 
 const getDueChildCount = (
@@ -42,7 +40,6 @@ const LineByLineView = ({
   childSessionData,
   setHasCloze,
   showBreadcrumbs,
-  autoCollapseBlocks,
 }: LineByLineViewProps) => {
   const { blockInfo } = useBlockInfo({ refUid: currentCardRefUid });
 
@@ -79,7 +76,6 @@ const LineByLineView = ({
               breadcrumbs={[]}
               showBreadcrumbs={false}
               onRenderComplete={NOOP}
-              autoExpand={isCurrentLine || !autoCollapseBlocks}
             />
           </LineByLineItem>
         );

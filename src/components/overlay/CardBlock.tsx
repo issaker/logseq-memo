@@ -15,7 +15,6 @@ const CardBlock = ({
   showBreadcrumbs,
   onRenderComplete,
   hideChildren,
-  autoExpand = true,
 }: {
   refUid: string;
   showAnswers: boolean;
@@ -24,7 +23,6 @@ const CardBlock = ({
   showBreadcrumbs: boolean;
   onRenderComplete?: () => void;
   hideChildren?: boolean;
-  autoExpand?: boolean;
 }) => {
   const ref = React.useRef<HTMLDivElement | null>(null);
   const [renderedBlockElm, setRenderedBlockElm] = React.useState<HTMLElement | null>(null);
@@ -33,7 +31,6 @@ const CardBlock = ({
   const [forceUpdate, setForceUpdate] = React.useState(0);
 
   const refUidRef = React.useRef(refUid);
-  const autoExpandRef = React.useRef(autoExpand);
 
   const observerRef = React.useRef<MutationObserver | null>(null);
 
@@ -43,17 +40,9 @@ const CardBlock = ({
     refUidRef.current = refUid;
   }, [refUid]);
 
-  React.useEffect(() => {
-    autoExpandRef.current = autoExpand;
-  }, [autoExpand]);
-
-  // Create a ref to store the debounced function
   const debouncedFnRef = React.useRef<(() => void) | null>(null);
 
   const handleBlockBlur = React.useCallback(() => {
-    // In the practice dialog, blur-based re-rendering destroys the DOM
-    // and breaks Roam's focus management (arrow navigation, text selection).
-    // Skip re-rendering for dialog blocks — they are in a read-only context.
     const dialog = ref.current?.closest('[role="dialog"]');
     if (dialog) return;
 
@@ -62,9 +51,7 @@ const CardBlock = ({
     });
   }, []);
 
-  // Set up the debounced function only once when the component mounts
   React.useEffect(() => {
-    // Define the function to be debounced
     const renderBlock = async () => {
       const currentRefUid = refUidRef.current;
       if (!ref.current) return;
@@ -75,23 +62,17 @@ const CardBlock = ({
       const roamBlockElm = ref.current.querySelector('.rm-block') as HTMLElement | null;
       setRenderedBlockElm(roamBlockElm);
       const isCollapsed = roamBlockElm?.classList.contains('rm-block--closed');
-      if (autoExpandRef.current && isCollapsed) {
+      if (isCollapsed) {
         const expandControlBtn = ref.current.querySelector('.block-expand .rm-caret');
         domUtils.simulateMouseClick(expandControlBtn);
         await asyncUtils.sleep(100);
         domUtils.simulateMouseClick(expandControlBtn);
-      } else if (!autoExpandRef.current && !isCollapsed) {
-        await window.roamAlphaAPI.updateBlock({
-          block: { uid: currentRefUid, open: false },
-        });
       }
 
-      // Disconnect any existing observer
       if (observerRef.current) {
         observerRef.current.disconnect();
       }
 
-      // Add a mutation observer to detect dynamically added textareas (so we can add blur listeners)
       const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
@@ -114,18 +95,14 @@ const CardBlock = ({
       observer.observe(ref.current, { childList: true, subtree: true });
       observerRef.current = observer;
 
-      // Notify parent that rendering is complete
       onRenderComplete?.();
     };
 
-    // Create the debounced function only once
     debouncedFnRef.current = asyncUtils.debounce(renderBlock, 100);
 
-    // Clean up function
     return () => {
       debouncedFnRef.current = null;
 
-      // 清理已注册的 blur 事件监听器，防止内存泄漏
       registeredTextareasRef.current.forEach((textarea) => {
         textarea.removeEventListener('blur', handleBlockBlur);
       });
@@ -138,12 +115,11 @@ const CardBlock = ({
     };
   }, [handleBlockBlur]);
 
-  // Call the debounced function when refUid changes
   React.useEffect(() => {
     if (debouncedFnRef.current) {
       debouncedFnRef.current();
     }
-  }, [refUid, forceUpdate, autoExpand]);
+  }, [refUid, forceUpdate]);
 
   return (
     <div>
@@ -157,7 +133,6 @@ const ContentWrapper = styled.div<{
   showAnswers: boolean;
   hideChildren?: boolean;
 }>`
-  // To align bullet on the left + ref count on the right correctly
   position: relative;
   left: -14px;
   width: calc(100% + 19px);
@@ -167,11 +142,9 @@ const ContentWrapper = styled.div<{
   }
 
   & .rm-block-separator {
-    min-width: unset; // Keeping roam block from expanding 100
+    min-width: unset;
   }
 
-  // Only apply cloze hiding to custom clozes with {} syntax
-  // Roam's native ^^ highlighting (.rm-highlight) keeps its default styles
   .roam-memo-cloze {
     background-color: ${(props) => (props.showAnswers ? colors.clozeVisible : colors.clozeHidden)};
     color: ${(props) => (props.showAnswers ? 'inherit' : 'transparent')};
@@ -185,7 +158,7 @@ const ContentWrapper = styled.div<{
 const Breadcrumbs = ({ breadcrumbs }) => {
   const items = breadcrumbs.map((breadcrumb, index) => ({
     current: index === breadcrumbs.length - 1,
-    text: breadcrumb.title || breadcrumb.string, // root pages have title but no string
+    text: breadcrumb.title || breadcrumb.string,
   }));
   return (
     <BreadCrumbWrapper className="rm-zoom zoom-path-view">
