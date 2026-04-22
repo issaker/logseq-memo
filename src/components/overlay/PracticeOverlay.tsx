@@ -312,7 +312,6 @@ const PracticeOverlay = ({
     currentCardRefUid,
     isLineByLineActive,
     childUidsList,
-    isOpen,
   });
 
   const effectiveBaseCardData = React.useMemo(() => {

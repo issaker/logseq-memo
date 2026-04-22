@@ -6,7 +6,6 @@ interface UseAutoCollapseBlocksInput {
   currentCardRefUid: string | undefined;
   isLineByLineActive: boolean;
   childUidsList: string[];
-  isOpen: boolean;
 }
 
 export default function useAutoCollapseBlocks({
@@ -14,27 +13,17 @@ export default function useAutoCollapseBlocks({
   currentCardRefUid,
   isLineByLineActive,
   childUidsList,
-  isOpen,
 }: UseAutoCollapseBlocksInput) {
-  const prevCardBlocksRef = React.useRef<string[]>([]);
+  const currentCardBlocksRef = React.useRef<string[]>([]);
   const prevCardRefUidRef = React.useRef<string | undefined>();
-  const isMountedRef = React.useRef(true);
-
-  React.useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   React.useEffect(() => {
     if (!enabled) return;
-    const prevUid = prevCardRefUidRef.current;
 
-    if (prevUid && prevUid !== currentCardRefUid && prevCardBlocksRef.current.length > 0) {
-      const blocksToCollapse = [...prevCardBlocksRef.current];
+    const prevUid = prevCardRefUidRef.current;
+    if (prevUid && prevUid !== currentCardRefUid && currentCardBlocksRef.current.length > 0) {
+      const blocksToCollapse = [...currentCardBlocksRef.current];
       setTimeout(() => {
-        if (!isMountedRef.current) return;
         blocksToCollapse.forEach((uid) => collapseBlockOnPage(uid));
       }, 300);
     }
@@ -45,21 +34,16 @@ export default function useAutoCollapseBlocks({
       if (isLineByLineActive) {
         blocks.push(...childUidsList);
       }
-      prevCardBlocksRef.current = blocks;
+      currentCardBlocksRef.current = blocks;
     } else {
-      prevCardBlocksRef.current = [];
+      currentCardBlocksRef.current = [];
     }
   }, [enabled, currentCardRefUid, isLineByLineActive, childUidsList]);
 
   React.useEffect(() => {
     if (!enabled) return;
-    if (!isOpen && prevCardBlocksRef.current.length > 0) {
-      const blocksToCollapse = [...prevCardBlocksRef.current];
-      prevCardBlocksRef.current = [];
-      setTimeout(() => {
-        if (!isMountedRef.current) return;
-        blocksToCollapse.forEach((uid) => collapseBlockOnPage(uid));
-      }, 500);
-    }
-  }, [enabled, isOpen]);
+    return () => {
+      currentCardBlocksRef.current.forEach((uid) => collapseBlockOnPage(uid));
+    };
+  }, [enabled]);
 }
