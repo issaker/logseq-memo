@@ -155,19 +155,20 @@ const TagSelectorItem = ({ text, onClick, active, tagsList }) => {
             text={
               <div className="flex items-center justify-between">
                 <span className="text-xs">Deck Weight</span>
-                <Blueprint.InputGroup
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={String(tagDeckWeight)}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const value = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                    setDeckWeight(text, value, tagsList);
-                  }}
-                  rightElement={<span className="text-xs" style={{ lineHeight: '30px', paddingRight: '8px' }}>%</span>}
-                  style={{ width: '60px' }}
-                  small
-                />
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Blueprint.InputGroup
+                    type="text"
+                    value={String(tagDeckWeight)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const raw = e.target.value.replace(/[^0-9]/g, '');
+                      const value = Math.min(100, Math.max(0, Number(raw) || 0));
+                      setDeckWeight(text, value, tagsList);
+                    }}
+                    rightElement={<span className="text-xs" style={{ lineHeight: '30px', paddingRight: '8px' }}>%</span>}
+                    style={{ width: '60px' }}
+                    small
+                  />
+                </div>
               </div>
             }
             className="hover:bg-transparent hover:no-underline"

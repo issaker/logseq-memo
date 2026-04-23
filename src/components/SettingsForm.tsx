@@ -112,7 +112,6 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
               setFormSettings((prev) => ({ ...prev, dailyLimit: value }));
             }}
             placeholder="0"
-            autoComplete="off"
             style={{ width: '100%' }}
           />
         </div>
@@ -134,7 +133,6 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
               setFormSettings((prev) => ({ ...prev, forgotReinsertOffset: value }));
             }}
             placeholder="3"
-            autoComplete="off"
             style={{ width: '100%' }}
           />
         </div>
@@ -156,7 +154,6 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
               setFormSettings((prev) => ({ ...prev, lblNextReinsertOffset: value }));
             }}
             placeholder="3"
-            autoComplete="off"
             style={{ width: '100%' }}
           />
         </div>
