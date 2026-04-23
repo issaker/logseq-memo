@@ -49,7 +49,7 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm } = React.useContext(MainContext);
+  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete } = React.useContext(MainContext);
   const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
@@ -224,6 +224,11 @@ const Footer = ({
             onStartCrammingClick={onStartCrammingClick}
             onCloseCallback={onCloseCallback}
           />
+        ) : isLineByLine && lineByLineIsCardComplete ? (
+          <LblCompletedControls
+            onPrevClick={onPrevClick}
+            onNextClick={skipFn}
+          />
         ) : !showAnswers ? (
           <AnswerHiddenControls
             activateButtonFn={activateButtonFn}
@@ -288,6 +293,54 @@ const FinishedControls = ({ onStartCrammingClick, onCloseCallback }) => {
     </>
   );
 };
+
+const LblCompletedControls = ({ onPrevClick, onNextClick }) => (
+  <div className="flex items-center gap-3">
+    <button
+      type="button"
+      aria-label="Previous"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onPrevClick();
+      }}
+      className="bp3-button bp3-minimal"
+      style={{
+        minWidth: '44px',
+        minHeight: '44px',
+        padding: '0 10px',
+        fontSize: '18px',
+        lineHeight: 1,
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      ◀
+    </button>
+    <span className="text-sm opacity-60">All lines reviewed</span>
+    <button
+      type="button"
+      aria-label="Next"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onNextClick();
+      }}
+      className="bp3-button bp3-minimal"
+      style={{
+        minWidth: '44px',
+        minHeight: '44px',
+        padding: '0 10px',
+        fontSize: '18px',
+        lineHeight: 1,
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      ▶
+    </button>
+  </div>
+);
 
 const GradingControlsWrapper = ({
   activeButtonKey,

@@ -63,7 +63,9 @@ const LineByLineView = ({
         hideChildren={true}
       />
       <LineByLineSeparator>
-        Line {lineByLineCurrentChildIndex + 1} / {childUidsList.length} ({dueCount} due)
+        {lineByLineCurrentChildIndex >= childUidsList.length
+          ? `Complete ✓ (${dueCount} due)`
+          : `Line ${lineByLineCurrentChildIndex + 1} / ${childUidsList.length} (${dueCount} due)`}
       </LineByLineSeparator>
       {childUidsList.slice(0, lineByLineRevealedCount).map((uid, index) => {
         const isCurrentLine = index === lineByLineCurrentChildIndex;

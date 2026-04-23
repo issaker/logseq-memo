@@ -99,6 +99,7 @@ interface MainContextProps {
   baseCardData: Session | undefined;
   currentChildAlgorithm: SchedulingAlgorithm | undefined;
   currentChildIsLblNext: boolean;
+  lineByLineIsCardComplete: boolean;
 }
 
 // 稳定引用：避免内联函数导致 React.memo 失效
@@ -388,6 +389,11 @@ const PracticeOverlay = ({
 
       if (isLineByLineActive && !lineByLineIsCardComplete) {
         onLineByLineGrade(gradeData.sm2_grade);
+        return;
+      }
+
+      if (isLineByLineActive && lineByLineIsCardComplete) {
+        setCurrentIndex((prev) => prev + 1);
         return;
       }
 
@@ -703,7 +709,8 @@ const PracticeOverlay = ({
     baseCardData: effectiveBaseCardData,
     currentChildAlgorithm: isLineByLineActive ? currentChildAlgorithm : undefined,
     currentChildIsLblNext: isLineByLineActive ? currentChildIsLblNext : false,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext]);
+    lineByLineIsCardComplete: isLineByLineActive ? lineByLineIsCardComplete : false,
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete]);
 
   if (!todaySelectedTag) {
     return null;
@@ -743,7 +750,7 @@ const PracticeOverlay = ({
         >
           {currentCardRefUid ? (
             <>
-              {isLineByLineActive && !lineByLineIsCardComplete ? (
+              {isLineByLineActive ? (
                 <LineByLineView
                   currentCardRefUid={currentCardRefUid}
                   childUidsList={childUidsList}
@@ -807,9 +814,9 @@ const PracticeOverlay = ({
             isLineByLineActive && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers
           }
           showAnswers={
-            isLineByLineActive ? lineByLineRevealedCount > lineByLineCurrentChildIndex : showAnswers
+            isLineByLineActive ? (lineByLineIsCardComplete || lineByLineRevealedCount > lineByLineCurrentChildIndex) : showAnswers
           }
-          isDone={isDone || lineByLineIsCardComplete}
+          isDone={isDone}
           hasCards={hasCards}
           onCloseCallback={onCloseCallback}
           currentCardData={currentCardData}
