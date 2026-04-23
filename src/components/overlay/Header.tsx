@@ -112,10 +112,11 @@ const Tag = styled(Blueprint.Tag)`
 `;
 
 const TagSelectorItem = ({ text, onClick, active, tagsList }) => {
-  const { today, setRenderMode } = usePracticeSession();
+  const { today, setRenderMode, setDeckWeight, settings } = usePracticeSession();
   const dueCount = today.tags[text].due;
   const newCount = today.tags[text].new;
   const tagRenderMode = today.tags[text].renderMode || RenderMode.Normal;
+  const tagDeckWeight = today.tags[text].deckWeight || 0;
   const [showTagSettings, setShowTagSettings] = React.useState(false);
 
   const index = tagsList.indexOf(text);
@@ -149,6 +150,29 @@ const TagSelectorItem = ({ text, onClick, active, tagsList }) => {
           }
           className="hover:bg-transparent hover:no-underline"
         />
+        {settings.dailyLimit > 0 && (
+          <Blueprint.MenuItem
+            text={
+              <div className="flex items-center justify-between">
+                <span className="text-xs">Deck Weight</span>
+                <div className="flex items-center" style={{ width: '120px' }}>
+                  <div style={{ width: '80px', margin: '0 8px 0 0' }}>
+                    <Blueprint.Slider
+                      min={0}
+                      max={100}
+                      stepSize={1}
+                      labelRenderer={false}
+                      value={tagDeckWeight}
+                      onChange={(value: number) => setDeckWeight(text, value, tagsList)}
+                    />
+                  </div>
+                  <span className="text-xs" style={{ minWidth: '28px', textAlign: 'right' }}>{tagDeckWeight}%</span>
+                </div>
+              </div>
+            }
+            className="hover:bg-transparent hover:no-underline"
+          />
+        )}
         <Blueprint.MenuDivider />
       </Blueprint.Menu>
     </div>

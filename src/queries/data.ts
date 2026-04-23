@@ -49,6 +49,7 @@ import {
   calculateCompletedTodayCounts,
   calculateTodayStatus,
   initializeToday,
+  getDefaultWeights,
 } from '~/queries/today';
 import { generateNewSession, getChildBlocksOnPage, getDailyNoteBlockUids } from './utils';
 import { DAILYNOTE_DECK_KEY } from '~/constants';
@@ -510,70 +511,133 @@ const limitRemainingPracticeData = ({
     return;
   }
 
-  const selectedCards = tagsList.reduce(
-    (acc, currentTag) => ({
-      ...acc,
-      [currentTag]: {
-        newUids: [],
-        dueUids: [],
-      },
-    }),
-    {}
-  );
+  const allWeightsZero = tagsList.every((tag) => !today.tags[tag].deckWeight);
+  const someWeightsZero = tagsList.some((tag) => !today.tags[tag].deckWeight);
+  let weights: Record<string, number>;
 
-  const targetNewCardsRatio = 0.25;
-  const targetNewCards =
-    remainingLimit === 1 ? 0 : Math.max(1, Math.floor(remainingLimit * targetNewCardsRatio));
-  const targetDueCards = remainingLimit - targetNewCards;
-
-  let totalNewAdded = 0;
-  let totalDueAdded = 0;
-
-  roundRobinLoop: while (totalNewAdded + totalDueAdded < totalRemaining) {
-    let addedInThisRound = false;
-    for (const currentTag of tagsList) {
-      if (totalNewAdded + totalDueAdded === remainingLimit) {
-        break roundRobinLoop;
-      }
-
-      const currentCards = selectedCards[currentTag];
-      const nextNewIndex = currentCards.newUids.length;
-      const nextNewCard = today.tags[currentTag].newUids[nextNewIndex];
-      const nextDueIndex = currentCards.dueUids.length;
-      const nextDueCard = today.tags[currentTag].dueUids[nextDueIndex];
-
-      const stillNeedNewCards = totalNewAdded < targetNewCards;
-      const stillNeedDueCards = totalDueAdded < targetDueCards;
-      const stillHaveDueCards = !!nextDueCard || totalDueAdded < totalDueAvailable;
-      const stillHaveNewCards = !!nextNewCard || totalNewAdded < totalNewAvailable;
-
-      if (nextNewCard && (stillNeedNewCards || !stillHaveDueCards)) {
-        selectedCards[currentTag].newUids.push(today.tags[currentTag].newUids[nextNewIndex]);
-        totalNewAdded++;
-        addedInThisRound = true;
-        continue;
-      }
-
-      if (nextDueCard && (stillNeedDueCards || !stillHaveNewCards)) {
-        selectedCards[currentTag].dueUids.push(today.tags[currentTag].dueUids[nextDueIndex]);
-        totalDueAdded++;
-        addedInThisRound = true;
-        continue;
-      }
+  if (allWeightsZero) {
+    weights = getDefaultWeights(tagsList);
+  } else if (someWeightsZero) {
+    const existingTotal = tagsList.reduce(
+      (sum, tag) => sum + (today.tags[tag].deckWeight || 0),
+      0
+    );
+    const missingCount = tagsList.filter((tag) => !today.tags[tag].deckWeight).length;
+    const remaining = Math.max(100 - existingTotal, 0);
+    const share = missingCount ? Math.floor(remaining / missingCount) : 0;
+    weights = {};
+    tagsList.forEach((tag) => {
+      weights[tag] = today.tags[tag].deckWeight || share;
+    });
+    const totalW = tagsList.reduce((s, t) => s + weights[t], 0);
+    if (totalW !== 100 && tagsList.length) {
+      weights[tagsList[0]] += 100 - totalW;
     }
+  } else {
+    weights = tagsList.reduce((acc, tag) => {
+      acc[tag] = today.tags[tag].deckWeight;
+      return acc;
+    }, {});
+  }
 
-    if (!addedInThisRound) {
-      break;
+  if (allWeightsZero || someWeightsZero) {
+    for (const tag of tagsList) {
+      today.tags[tag].deckWeight = weights[tag];
+    }
+  }
+
+  const originalDueUids: Record<string, RecordUid[]> = {};
+  const originalNewUids: Record<string, RecordUid[]> = {};
+  for (const tag of tagsList) {
+    originalDueUids[tag] = [...today.tags[tag].dueUids];
+    originalNewUids[tag] = [...today.tags[tag].newUids];
+  }
+
+  const deckQuotas: Record<string, number> = {};
+  for (const tag of tagsList) {
+    deckQuotas[tag] = Math.ceil(remainingLimit * weights[tag] / 100);
+  }
+
+  const totalQuota = tagsList.reduce((sum, tag) => sum + deckQuotas[tag], 0);
+  if (totalQuota > remainingLimit) {
+    const sortedByQuota = [...tagsList].sort(
+      (a, b) => deckQuotas[b] - deckQuotas[a]
+    );
+    let excess = totalQuota - remainingLimit;
+    for (const tag of sortedByQuota) {
+      if (excess <= 0) break;
+      const reduction = Math.min(excess, deckQuotas[tag] - 1);
+      if (reduction > 0) {
+        deckQuotas[tag] -= reduction;
+        excess -= reduction;
+      }
     }
   }
 
   for (const tag of tagsList) {
+    const quota = deckQuotas[tag];
+    const dueAvailable = originalDueUids[tag].length;
+    const newAvailable = originalNewUids[tag].length;
+    const available = dueAvailable + newAvailable;
+
+    if (available <= quota) continue;
+
+    const targetNewRatio = 0.25;
+    let targetNew = quota === 1 ? 0 : Math.max(1, Math.floor(quota * targetNewRatio));
+    let targetDue = quota - targetNew;
+
+    if (targetNew > newAvailable) {
+      targetNew = newAvailable;
+      targetDue = Math.min(quota - targetNew, dueAvailable);
+    }
+    if (targetDue > dueAvailable) {
+      targetDue = dueAvailable;
+      targetNew = Math.min(quota - targetDue, newAvailable);
+    }
+
     today.tags[tag] = {
       ...today.tags[tag],
-      dueUids: selectedCards[tag].dueUids,
-      newUids: selectedCards[tag].newUids,
-      due: selectedCards[tag].dueUids.length,
-      new: selectedCards[tag].newUids.length,
+      dueUids: originalDueUids[tag].slice(0, targetDue),
+      newUids: originalNewUids[tag].slice(0, targetNew),
+      due: targetDue,
+      new: targetNew,
     };
+  }
+
+  const totalSelected = tagsList.reduce(
+    (sum, tag) => sum + today.tags[tag].due + today.tags[tag].new,
+    0
+  );
+
+  if (totalSelected < remainingLimit) {
+    let leftover = remainingLimit - totalSelected;
+    for (const tag of tagsList) {
+      if (leftover <= 0) break;
+      const currentDueLen = today.tags[tag].dueUids.length;
+      const origDueLen = originalDueUids[tag].length;
+      const extraDue = Math.min(leftover, origDueLen - currentDueLen);
+      if (extraDue > 0) {
+        today.tags[tag].dueUids = [
+          ...today.tags[tag].dueUids,
+          ...originalDueUids[tag].slice(currentDueLen, currentDueLen + extraDue),
+        ];
+        today.tags[tag].due += extraDue;
+        leftover -= extraDue;
+      }
+    }
+    for (const tag of tagsList) {
+      if (leftover <= 0) break;
+      const currentNewLen = today.tags[tag].newUids.length;
+      const origNewLen = originalNewUids[tag].length;
+      const extraNew = Math.min(leftover, origNewLen - currentNewLen);
+      if (extraNew > 0) {
+        today.tags[tag].newUids = [
+          ...today.tags[tag].newUids,
+          ...originalNewUids[tag].slice(currentNewLen, currentNewLen + extraNew),
+        ];
+        today.tags[tag].new += extraNew;
+        leftover -= extraNew;
+      }
+    }
   }
 };

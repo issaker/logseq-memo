@@ -34,6 +34,7 @@ export const initializeToday = ({ tagsList, cachedData }) => {
       dueUids: [],
       completedUids: [],
       renderMode: cachedTagData?.renderMode || RenderMode.Normal,
+      deckWeight: Number(cachedTagData?.deckWeight) || 0,
     };
   }
 
@@ -222,4 +223,73 @@ export const addDueCards = ({ today, tagsList, sessionData, isCramming, shuffleC
       due: dueCardsUids.length,
     };
   }
+};
+
+export const getDefaultWeights = (tagsList: string[]): Record<string, number> => {
+  if (!tagsList.length) return {};
+  const base = Math.floor(100 / tagsList.length);
+  const remainder = 100 - base * tagsList.length;
+  const weights: Record<string, number> = {};
+  tagsList.forEach((tag, i) => {
+    weights[tag] = base + (i < remainder ? 1 : 0);
+  });
+  return weights;
+};
+
+export const distributeWeights = (
+  tagsList: string[],
+  currentWeights: Record<string, number>,
+  changedTag: string,
+  newWeight: number
+): Record<string, number> => {
+  const clampedWeight = Math.min(Math.max(newWeight, 0), 100);
+  const otherTags = tagsList.filter((t) => t !== changedTag);
+  const remaining = 100 - clampedWeight;
+
+  if (!otherTags.length) {
+    return { [changedTag]: 100 };
+  }
+
+  const otherCurrentTotal = otherTags.reduce(
+    (sum, t) => sum + (currentWeights[t] || 0),
+    0
+  );
+
+  const result: Record<string, number> = { [changedTag]: clampedWeight };
+
+  if (otherCurrentTotal === 0) {
+    const equalShare = Math.floor(remaining / otherTags.length);
+    const remainder = remaining - equalShare * otherTags.length;
+    otherTags.forEach((tag, i) => {
+      result[tag] = equalShare + (i < remainder ? 1 : 0);
+    });
+  } else {
+    let distributed = 0;
+    const rawWeights: Record<string, number> = {};
+
+    otherTags.forEach((tag) => {
+      const proportion = (currentWeights[tag] || 0) / otherCurrentTotal;
+      const raw = remaining * proportion;
+      const floored = Math.floor(raw);
+      rawWeights[tag] = floored;
+      distributed += floored;
+    });
+
+    const diff = remaining - distributed;
+    const sortedByRemainder = [...otherTags].sort((a, b) => {
+      const rA = remaining * ((currentWeights[a] || 0) / otherCurrentTotal) - rawWeights[a];
+      const rB = remaining * ((currentWeights[b] || 0) / otherCurrentTotal) - rawWeights[b];
+      return rB - rA;
+    });
+
+    for (let i = 0; i < diff; i++) {
+      rawWeights[sortedByRemainder[i]]++;
+    }
+
+    otherTags.forEach((tag) => {
+      result[tag] = rawWeights[tag];
+    });
+  }
+
+  return result;
 };

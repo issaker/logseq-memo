@@ -18,6 +18,7 @@ export interface PracticeSessionContextValue {
   fetchPracticeData: () => void;
   dataPageTitle: string;
   setRenderMode: (tag: string, mode: RenderMode) => void;
+  setDeckWeight: (tag: string, weight: number, tagsList: string[]) => void;
   updateSetting: (key: keyof Settings, value: any) => void;
   algorithm?: SchedulingAlgorithm;
   interaction?: InteractionStyle;
@@ -42,6 +43,7 @@ interface PracticeSessionProviderProps {
   fetchPracticeData: () => void;
   dataPageTitle: string;
   setRenderMode: (tag: string, mode: RenderMode) => void;
+  setDeckWeight: (tag: string, weight: number, tagsList: string[]) => void;
   updateSetting: (key: keyof Settings, value: any) => void;
   children: React.ReactNode;
 }
@@ -59,6 +61,7 @@ export const PracticeSessionProvider = ({
   fetchPracticeData,
   dataPageTitle,
   setRenderMode,
+  setDeckWeight,
   updateSetting,
   children,
 }: PracticeSessionProviderProps) => {
@@ -76,6 +79,7 @@ export const PracticeSessionProvider = ({
       fetchPracticeData,
       dataPageTitle,
       setRenderMode,
+      setDeckWeight,
       updateSetting,
     }),
     [
@@ -91,6 +95,7 @@ export const PracticeSessionProvider = ({
       fetchPracticeData,
       dataPageTitle,
       setRenderMode,
+      setDeckWeight,
       updateSetting,
     ]
   );

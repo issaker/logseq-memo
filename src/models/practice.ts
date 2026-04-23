@@ -31,6 +31,7 @@ export type Today = {
       completed: number;
       completedUids: RecordUid[];
       renderMode: RenderMode;
+      deckWeight: number;
     };
   };
   combinedToday: {

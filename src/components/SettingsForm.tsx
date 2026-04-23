@@ -99,7 +99,9 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
         <div style={{ marginBottom: '20px' }}>
           <h5 style={{ margin: '0 0 10px 0' }}>Daily Review Limit</h5>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-            Number of cards to review each day. 0 means no limit.
+            Number of cards to review each day. 0 means no limit. When set (&gt;0), each
+            deck&apos;s limit = this value × deck weight %. Adjust deck weights via the gear
+            icon next to each deck.
           </p>
           <input
             type="number"
