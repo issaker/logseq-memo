@@ -23,7 +23,7 @@
  *   │       ├── renderMode:: normal
  *   │       └── ...
  *   └── settings (heading block)
- *       ├── tagsListString:: memo
+ *       ├── deckConfigs:: [{"name":"memo","swapQA":false,"weight":100}]
  *       └── ...
  *
  * Key Design Principle:
@@ -49,10 +49,10 @@ import {
   calculateCompletedTodayCounts,
   calculateTodayStatus,
   initializeToday,
-  getDefaultWeights,
 } from '~/queries/today';
 import { generateNewSession, getChildBlocksOnPage, getDailyNoteBlockUids } from './utils';
 import { DAILYNOTE_DECK_KEY } from '~/constants';
+import { DeckConfig } from '~/hooks/useSettings';
 
 export const getPracticeData = async ({
   tagsList,
@@ -61,13 +61,14 @@ export const getPracticeData = async ({
   isCramming,
   shuffleCards,
   cachedData,
+  deckConfigs,
 }) => {
   const pluginPageData = (await getPluginPageData({
     dataPageTitle,
     limitToLatest: true,
   })) as Records;
 
-  const today = initializeToday({ tagsList, cachedData });
+  const today = initializeToday({ tagsList, cachedData, deckConfigs });
   const sessionData = {};
   const cardUids: Record<string, RecordUid[]> = {};
 
@@ -85,7 +86,7 @@ export const getPracticeData = async ({
   addNewCards({ today, tagsList, cardUids, pluginPageData, shuffleCards });
   addDueCards({ today, tagsList, sessionData, isCramming, shuffleCards });
 
-  limitRemainingPracticeData({ today, dailyLimit, tagsList, isCramming });
+  limitRemainingPracticeData({ today, dailyLimit, tagsList, isCramming, deckConfigs });
   calculateCombinedCounts({ today, tagsList });
 
   calculateTodayStatus({ today, tagsList });
@@ -455,25 +456,39 @@ export const getChildSessionData = async ({
   return result;
 };
 
-/**
- * Daily limit enforcement: ensures ~25% new cards, rest due cards.
- * Round-robin across decks for fair distribution.
- * Skipped when cramming (no limit) or dailyLimit is 0.
- *
- * The remaining limit is `dailyLimit - totalCompleted`: completed cards
- * reduce the pool without needing to restore them into the UID lists.
- */
 const limitRemainingPracticeData = ({
   today,
   dailyLimit,
   tagsList,
   isCramming,
+  deckConfigs,
 }: {
   today: Today;
   dailyLimit: number;
   tagsList: string[];
   isCramming: boolean;
+  deckConfigs: string;
 }) => {
+  let parsedDeckConfigs: DeckConfig[] = [];
+  try {
+    parsedDeckConfigs = JSON.parse(deckConfigs);
+  } catch {
+    parsedDeckConfigs = [];
+  }
+
+  const weightMap: Record<string, number> = {};
+  for (const config of parsedDeckConfigs) {
+    weightMap[config.name] = config.weight;
+  }
+
+  const deckCaps: Record<string, number> = {};
+  for (const tag of tagsList) {
+    if (tag === DAILYNOTE_DECK_KEY) continue;
+    if (tag in weightMap) {
+      deckCaps[tag] = Math.ceil(dailyLimit * (weightMap[tag] / 100));
+    }
+  }
+
   const totalCompleted = tagsList.reduce(
     (sum, tag) => sum + today.tags[tag].completed,
     0
@@ -511,133 +526,148 @@ const limitRemainingPracticeData = ({
     return;
   }
 
-  const allWeightsZero = tagsList.every((tag) => !today.tags[tag].deckWeight);
-  const someWeightsZero = tagsList.some((tag) => !today.tags[tag].deckWeight);
-  let weights: Record<string, number>;
+  const targetNew = remainingLimit === 1 ? 0 : Math.max(1, Math.floor(remainingLimit * 0.25));
+  const targetDue = remainingLimit - targetNew;
 
-  if (allWeightsZero) {
-    weights = getDefaultWeights(tagsList);
-  } else if (someWeightsZero) {
-    const existingTotal = tagsList.reduce(
-      (sum, tag) => sum + (today.tags[tag].deckWeight || 0),
-      0
-    );
-    const missingCount = tagsList.filter((tag) => !today.tags[tag].deckWeight).length;
-    const remaining = Math.max(100 - existingTotal, 0);
-    const share = missingCount ? Math.floor(remaining / missingCount) : 0;
-    weights = {};
-    tagsList.forEach((tag) => {
-      weights[tag] = today.tags[tag].deckWeight || share;
-    });
-    const totalW = tagsList.reduce((s, t) => s + weights[t], 0);
-    if (totalW !== 100 && tagsList.length) {
-      weights[tagsList[0]] += 100 - totalW;
-    }
-  } else {
-    weights = tagsList.reduce((acc, tag) => {
-      acc[tag] = today.tags[tag].deckWeight;
-      return acc;
-    }, {});
-  }
-
-  if (allWeightsZero || someWeightsZero) {
-    for (const tag of tagsList) {
-      today.tags[tag].deckWeight = weights[tag];
-    }
-  }
-
-  const originalDueUids: Record<string, RecordUid[]> = {};
-  const originalNewUids: Record<string, RecordUid[]> = {};
-  for (const tag of tagsList) {
-    originalDueUids[tag] = [...today.tags[tag].dueUids];
-    originalNewUids[tag] = [...today.tags[tag].newUids];
-  }
-
-  const deckQuotas: Record<string, number> = {};
-  for (const tag of tagsList) {
-    deckQuotas[tag] = Math.ceil(remainingLimit * weights[tag] / 100);
-  }
-
-  const totalQuota = tagsList.reduce((sum, tag) => sum + deckQuotas[tag], 0);
-  if (totalQuota > remainingLimit) {
-    const sortedByQuota = [...tagsList].sort(
-      (a, b) => deckQuotas[b] - deckQuotas[a]
-    );
-    let excess = totalQuota - remainingLimit;
-    for (const tag of sortedByQuota) {
-      if (excess <= 0) break;
-      const reduction = Math.min(excess, deckQuotas[tag] - 1);
-      if (reduction > 0) {
-        deckQuotas[tag] -= reduction;
-        excess -= reduction;
-      }
-    }
-  }
-
-  for (const tag of tagsList) {
-    const quota = deckQuotas[tag];
-    const dueAvailable = originalDueUids[tag].length;
-    const newAvailable = originalNewUids[tag].length;
-    const available = dueAvailable + newAvailable;
-
-    if (available <= quota) continue;
-
-    const targetNewRatio = 0.25;
-    let targetNew = quota === 1 ? 0 : Math.max(1, Math.floor(quota * targetNewRatio));
-    let targetDue = quota - targetNew;
-
-    if (targetNew > newAvailable) {
-      targetNew = newAvailable;
-      targetDue = Math.min(quota - targetNew, dueAvailable);
-    }
-    if (targetDue > dueAvailable) {
-      targetDue = dueAvailable;
-      targetNew = Math.min(quota - targetDue, newAvailable);
-    }
-
-    today.tags[tag] = {
-      ...today.tags[tag],
-      dueUids: originalDueUids[tag].slice(0, targetDue),
-      newUids: originalNewUids[tag].slice(0, targetNew),
-      due: targetDue,
-      new: targetNew,
-    };
-  }
-
-  const totalSelected = tagsList.reduce(
-    (sum, tag) => sum + today.tags[tag].due + today.tags[tag].new,
-    0
+  const selectedCards = tagsList.reduce(
+    (acc, currentTag) => ({
+      ...acc,
+      [currentTag]: {
+        newUids: [],
+        dueUids: [],
+      },
+    }),
+    {} as Record<string, { newUids: string[]; dueUids: string[] }>
   );
 
-  if (totalSelected < remainingLimit) {
-    let leftover = remainingLimit - totalSelected;
+  const deckSelected: Record<string, number> = {};
+  for (const tag of tagsList) {
+    deckSelected[tag] = 0;
+  }
+
+  let dueSelected = 0;
+  while (dueSelected < targetDue) {
+    let addedInThisRound = false;
     for (const tag of tagsList) {
-      if (leftover <= 0) break;
-      const currentDueLen = today.tags[tag].dueUids.length;
-      const origDueLen = originalDueUids[tag].length;
-      const extraDue = Math.min(leftover, origDueLen - currentDueLen);
-      if (extraDue > 0) {
-        today.tags[tag].dueUids = [
-          ...today.tags[tag].dueUids,
-          ...originalDueUids[tag].slice(currentDueLen, currentDueLen + extraDue),
-        ];
-        today.tags[tag].due += extraDue;
-        leftover -= extraDue;
+      if (dueSelected >= targetDue) break;
+
+      if (tag in deckCaps && deckSelected[tag] >= deckCaps[tag]) continue;
+
+      const currentSelected = selectedCards[tag];
+      if (currentSelected.dueUids.length < today.tags[tag].dueUids.length) {
+        currentSelected.dueUids.push(today.tags[tag].dueUids[currentSelected.dueUids.length]);
+        deckSelected[tag]++;
+        dueSelected++;
+        addedInThisRound = true;
       }
     }
+    if (!addedInThisRound) break;
+  }
+
+  let newSelected = 0;
+  while (newSelected < targetNew) {
+    let addedInThisRound = false;
     for (const tag of tagsList) {
-      if (leftover <= 0) break;
-      const currentNewLen = today.tags[tag].newUids.length;
-      const origNewLen = originalNewUids[tag].length;
-      const extraNew = Math.min(leftover, origNewLen - currentNewLen);
-      if (extraNew > 0) {
-        today.tags[tag].newUids = [
-          ...today.tags[tag].newUids,
-          ...originalNewUids[tag].slice(currentNewLen, currentNewLen + extraNew),
-        ];
-        today.tags[tag].new += extraNew;
-        leftover -= extraNew;
+      if (newSelected >= targetNew) break;
+
+      if (tag in deckCaps && deckSelected[tag] >= deckCaps[tag]) continue;
+
+      const currentSelected = selectedCards[tag];
+      if (currentSelected.newUids.length < today.tags[tag].newUids.length) {
+        currentSelected.newUids.push(today.tags[tag].newUids[currentSelected.newUids.length]);
+        deckSelected[tag]++;
+        newSelected++;
+        addedInThisRound = true;
       }
     }
+    if (!addedInThisRound) break;
+  }
+
+  let totalAllocated = dueSelected + newSelected;
+  if (totalAllocated < remainingLimit) {
+    let unused = remainingLimit - totalAllocated;
+    const newNeeded = Math.max(0, targetNew - newSelected);
+
+    while (unused > 0 && newSelected < targetNew) {
+      let addedInThisRound = false;
+      for (const tag of tagsList) {
+        if (unused <= 0 || newSelected >= targetNew) break;
+
+        const currentSelected = selectedCards[tag];
+        if (currentSelected.newUids.length < today.tags[tag].newUids.length) {
+          currentSelected.newUids.push(today.tags[tag].newUids[currentSelected.newUids.length]);
+          deckSelected[tag]++;
+          newSelected++;
+          totalAllocated++;
+          unused--;
+          addedInThisRound = true;
+        }
+      }
+      if (!addedInThisRound) break;
+    }
+
+    while (unused > 0) {
+      let addedInThisRound = false;
+      for (const tag of tagsList) {
+        if (unused <= 0) break;
+
+        const currentSelected = selectedCards[tag];
+        if (currentSelected.dueUids.length < today.tags[tag].dueUids.length) {
+          currentSelected.dueUids.push(today.tags[tag].dueUids[currentSelected.dueUids.length]);
+          deckSelected[tag]++;
+          totalAllocated++;
+          unused--;
+          addedInThisRound = true;
+        }
+      }
+      if (!addedInThisRound) break;
+    }
+
+    while (unused > 0) {
+      let addedInThisRound = false;
+      for (const tag of tagsList) {
+        if (unused <= 0) break;
+
+        const currentSelected = selectedCards[tag];
+        if (currentSelected.newUids.length < today.tags[tag].newUids.length) {
+          currentSelected.newUids.push(today.tags[tag].newUids[currentSelected.newUids.length]);
+          deckSelected[tag]++;
+          totalAllocated++;
+          unused--;
+          addedInThisRound = true;
+        }
+      }
+      if (!addedInThisRound) break;
+    }
+  }
+
+  if (totalAllocated > remainingLimit) {
+    let excess = totalAllocated - remainingLimit;
+    const reverseTags = [...tagsList].reverse();
+    for (const tag of reverseTags) {
+      while (excess > 0 && selectedCards[tag].newUids.length > 0) {
+        selectedCards[tag].newUids.pop();
+        deckSelected[tag]--;
+        totalAllocated--;
+        excess--;
+      }
+      while (excess > 0 && selectedCards[tag].dueUids.length > 0) {
+        selectedCards[tag].dueUids.pop();
+        deckSelected[tag]--;
+        totalAllocated--;
+        excess--;
+      }
+      if (excess <= 0) break;
+    }
+  }
+
+  for (const tag of tagsList) {
+    today.tags[tag] = {
+      ...today.tags[tag],
+      dueUids: selectedCards[tag].dueUids,
+      newUids: selectedCards[tag].newUids,
+      due: selectedCards[tag].dueUids.length,
+      new: selectedCards[tag].newUids.length,
+    };
   }
 };

@@ -1,5 +1,5 @@
 import { getOrCreatePage, getOrCreateBlockOnPage, getChildBlock } from '~/queries/utils';
-import { defaultSettings, Settings } from '~/hooks/useSettings';
+import { defaultSettings, Settings, DeckConfig } from '~/hooks/useSettings';
 
 const SETTINGS_BLOCK_NAME = 'settings';
 
@@ -37,7 +37,7 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
 
     // Save each setting as a child block
     const settingsToSave = {
-      tagsListString: settings.tagsListString,
+      deckConfigs: settings.deckConfigs,
       dataPageTitle: settings.dataPageTitle,
       dailyLimit: settings.dailyLimit.toString(),
       historyCleanupKeepCount: settings.historyCleanupKeepCount.toString(),
@@ -132,8 +132,8 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
           
           // Convert values to appropriate types
           switch (key) {
-            case 'tagsListString':
-              loadedSettings.tagsListString = value;
+            case 'deckConfigs':
+              loadedSettings.deckConfigs = value;
               break;
             case 'dataPageTitle':
               loadedSettings.dataPageTitle = value;
@@ -173,6 +173,30 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
       } catch (err) {
         console.error('Memo: Error parsing setting from block', blockUid, blockString, err);
       }
+    }
+
+    if (!loadedSettings.deckConfigs && (loadedSettings as any).tagsListString) {
+      const str = (loadedSettings as any).tagsListString as string;
+      const deckNames: string[] = [];
+      let current = '';
+      let isInsideQuote = false;
+      for (let i = 0; i < str.length; i++) {
+        const currentChar = str[i];
+        if (currentChar === '"') { isInsideQuote = !isInsideQuote; }
+        else if (currentChar === ',' && !isInsideQuote) { deckNames.push(current.trim()); current = ''; }
+        else { current += currentChar; }
+      }
+      deckNames.push(current.trim());
+
+      const weight = Math.floor(100 / deckNames.length);
+      const remainder = 100 - weight * deckNames.length;
+      const deckConfigs: DeckConfig[] = deckNames.map((name, index) => ({
+        name,
+        swapQA: false,
+        weight: index === 0 ? weight + remainder : weight,
+      }));
+      loadedSettings.deckConfigs = JSON.stringify(deckConfigs);
+      delete (loadedSettings as any).tagsListString;
     }
 
     

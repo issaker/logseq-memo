@@ -6,7 +6,6 @@ import * as dateUtils from '~/utils/date';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
 import { ALGORITHM_META, INTERACTION_META, SchedulingAlgorithm, InteractionStyle, getAlgorithmIntent } from '~/models/session';
-import { RenderMode } from '~/models/practice';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { colors } from '~/theme';
 import { useSafeContext } from '~/hooks/useSafeContext';
@@ -112,72 +111,12 @@ const Tag = styled(Blueprint.Tag)`
 `;
 
 const TagSelectorItem = ({ text, onClick, active, tagsList }) => {
-  const { today, setRenderMode, setDeckWeight, settings } = usePracticeSession();
+  const { today } = usePracticeSession();
   const dueCount = today.tags[text].due;
   const newCount = today.tags[text].new;
-  const tagRenderMode = today.tags[text].renderMode || RenderMode.Normal;
-  const tagDeckWeight = today.tags[text].deckWeight || 0;
-  const [showTagSettings, setShowTagSettings] = React.useState(false);
 
   const index = tagsList.indexOf(text);
   const placement = index === tagsList.length - 1 ? 'bottom' : 'top';
-
-  const toggleTagSettings = () => {
-    setShowTagSettings(!showTagSettings);
-  };
-
-  const toggleRenderMode = () => {
-    const newRenderMode =
-      tagRenderMode === RenderMode.Normal ? RenderMode.AnswerFirst : RenderMode.Normal;
-
-    setRenderMode(text, newRenderMode);
-  };
-
-  const tagSettingsMenu = (
-    <div onClick={(e) => e.stopPropagation()}>
-      <Blueprint.Menu className="bg-transparent min-w-full text-sm">
-        <Blueprint.MenuItem
-          text={
-            <div className="flex items-center justify-between">
-              <span className="text-xs">Swap Q/A</span>
-              <Blueprint.Switch
-                alignIndicator={Blueprint.Alignment.RIGHT}
-                checked={tagRenderMode === RenderMode.AnswerFirst}
-                onChange={toggleRenderMode}
-                className="mb-0"
-              />
-            </div>
-          }
-          className="hover:bg-transparent hover:no-underline"
-        />
-        {settings.dailyLimit > 0 && (
-          <Blueprint.MenuItem
-            text={
-              <div className="flex items-center justify-between">
-                <span className="text-xs">Deck Weight</span>
-                <div onClick={(e) => e.stopPropagation()}>
-                  <Blueprint.InputGroup
-                    type="text"
-                    value={String(tagDeckWeight)}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const raw = e.target.value.replace(/[^0-9]/g, '');
-                      const value = Math.min(100, Math.max(0, Number(raw) || 0));
-                      setDeckWeight(text, value, tagsList);
-                    }}
-                    rightElement={<span className="text-xs" style={{ lineHeight: '30px', paddingRight: '8px' }}>%</span>}
-                    style={{ width: '60px' }}
-                    small
-                  />
-                </div>
-              </div>
-            }
-            className="hover:bg-transparent hover:no-underline"
-          />
-        )}
-        <Blueprint.MenuDivider />
-      </Blueprint.Menu>
-    </div>
-  );
 
   return (
     <TagSelectorItemWrapper
@@ -221,17 +160,7 @@ const TagSelectorItem = ({ text, onClick, active, tagsList }) => {
             </Tooltip>
           )}
         </div>
-        <div onClick={(e) => e.stopPropagation()} className="">
-          <Blueprint.Button
-            icon={<Blueprint.Icon icon={showTagSettings ? 'chevron-up' : 'cog'} size={11} />}
-            className="ml-1 bp3-small"
-            data-testid="tag-settings-button"
-            minimal
-            onClick={toggleTagSettings}
-          />
-        </div>
       </div>
-      <Blueprint.Collapse isOpen={showTagSettings}>{tagSettingsMenu}</Blueprint.Collapse>
     </TagSelectorItemWrapper>
   );
 };

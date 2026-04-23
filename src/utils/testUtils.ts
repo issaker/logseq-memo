@@ -303,7 +303,7 @@ export class MockDataBuilder {
     return {
       ...defaultSettings,
       ...this.settingsOverride,
-      tagsListString: this.tags.join(', '),
+      deckConfigs: JSON.stringify(this.tags.map((name) => ({ name, swapQA: false, weight: Math.round(100 / this.tags.length) }))),
       isCramming: false,
     };
   }
@@ -347,6 +347,7 @@ export class MockDataBuilder {
       isCramming: !!settings.isCramming,
       shuffleCards: !!settings.shuffleCards,
       cachedData: {},
+      deckConfigs: settings.deckConfigs || '[]',
     });
 
     return practiceData;

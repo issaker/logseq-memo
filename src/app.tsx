@@ -25,8 +25,6 @@ import useCommandPaletteAction from '~/hooks/useCommandPaletteAction';
 import useCachedData from '~/hooks/useCachedData';
 import useOnVisibilityStateChange from '~/hooks/useOnVisibilityStateChange';
 import { Session } from '~/models/session';
-import { RenderMode } from '~/models/practice';
-import { distributeWeights, getDefaultWeights } from '~/queries/today';
 
 export type handlePracticeProps = Session & {
   refUid: string;
@@ -42,12 +40,12 @@ const App = () => {
     updateSetting,
   } = useSettings();
   const {
-    tagsListString,
+    deckConfigs,
     dataPageTitle,
     dailyLimit,
     shuffleCards,
   } = settings;
-  const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString, dailynoteEnabled: settings.dailynoteEnabled });
+  const { selectedTag, setSelectedTag, tagsList } = useTags({ deckConfigs, dailynoteEnabled: settings.dailynoteEnabled });
 
   const { fetchCacheData, saveCacheData, data: cachedData } = useCachedData({ dataPageTitle });
 
@@ -59,25 +57,12 @@ const App = () => {
     isCramming,
     dailyLimit,
     shuffleCards,
+    deckConfigs,
   });
 
   React.useEffect(() => {
     refreshData();
-  }, [tagsListString]);
-
-  React.useEffect(() => {
-    if (!tagsList.length || !dailyLimit) return;
-    const needsInit = tagsList.some((tag) => !today.tags[tag]?.deckWeight);
-    if (!needsInit) return;
-    const defaultWeights = getDefaultWeights(tagsList);
-    for (const tag of tagsList) {
-      if (!today.tags[tag]?.deckWeight) {
-        saveCacheData({ deckWeight: defaultWeights[tag] }, { selectedTag: tag });
-      }
-    }
-    fetchCacheData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tagsList]);
+  }, [deckConfigs]);
 
   const handlePracticeClick = async ({ refUid, ...cardData }: handlePracticeProps) => {
     if (!refUid) {
@@ -96,26 +81,6 @@ const App = () => {
     } catch (error) {
       console.error('Error Saving Practice Data', error);
     }
-  };
-
-  const setRenderMode = (tag: string, mode: RenderMode) => {
-    saveCacheData({ renderMode: mode }, { selectedTag: tag });
-    fetchCacheData();
-  };
-
-  const setDeckWeight = (tag: string, weight: number, currentTagsList: string[]) => {
-    const currentWeights: Record<string, number> = {};
-    for (const t of currentTagsList) {
-      currentWeights[t] = today.tags[t]?.deckWeight || 0;
-    }
-    const allZero = currentTagsList.every((t) => !currentWeights[t]);
-    const baseWeights = allZero ? getDefaultWeights(currentTagsList) : currentWeights;
-    const newWeights = distributeWeights(currentTagsList, baseWeights, tag, weight);
-
-    for (const t of currentTagsList) {
-      saveCacheData({ deckWeight: newWeights[t] }, { selectedTag: t });
-    }
-    fetchCacheData();
   };
 
   const refreshData = () => {
@@ -209,8 +174,6 @@ const App = () => {
             handleMemoTagChange={handleMemoTagChange}
             fetchPracticeData={fetchPracticeData}
             dataPageTitle={dataPageTitle}
-            setRenderMode={setRenderMode}
-            setDeckWeight={setDeckWeight}
             updateSetting={updateSetting}
           >
             <PracticeOverlay

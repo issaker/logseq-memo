@@ -32,8 +32,10 @@ import React from 'react';
 import settingsPanelConfig from '~/settingsPanelConfig';
 import { loadSettingsFromPage, saveSettingsToPage } from '~/queries/settings';
 
+export type DeckConfig = { name: string; swapQA: boolean; weight: number };
+
 export type Settings = {
-  tagsListString: string;
+  deckConfigs: string;
   dataPageTitle: string;
   dailyLimit: number;
   historyCleanupKeepCount: number;
@@ -48,7 +50,7 @@ export type Settings = {
 };
 
 export const defaultSettings: Settings = {
-  tagsListString: 'memo',
+  deckConfigs: '[{"name":"memo","swapQA":false,"weight":100}]',
   dataPageTitle: 'roam/memo',
   dailyLimit: 0,
   historyCleanupKeepCount: 3,
@@ -63,6 +65,7 @@ export const defaultSettings: Settings = {
 };
 
 const SETTING_TYPES = {
+  deckConfigs: 'string',
   dailyLimit: 'number',
   historyCleanupKeepCount: 'number',
   rtlEnabled: 'boolean',
@@ -98,15 +101,6 @@ const useSettings = () => {
   const pageSyncTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const pendingPageSyncRef = React.useRef<Settings | null>(null);
   const hasInitializedRef = React.useRef(false);
-
-  React.useEffect(() => {
-    if (!settings.tagsListString.trim()) {
-      setSettings((currentSettings) => ({
-        ...currentSettings,
-        tagsListString: defaultSettings.tagsListString,
-      }));
-    }
-  }, [settings.tagsListString]);
 
   React.useEffect(() => {
     window.roamMemo.extensionAPI.settings.panel.create(

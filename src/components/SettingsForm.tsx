@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { colors } from '~/theme';
 import { Settings } from '~/hooks/useSettings';
+import DeckConfigsTable from '~/components/DeckConfigsTable';
 
 export type SettingsFormSettings = Omit<Settings, 'historyCleanupKeepCount' | 'showBreadcrumbs'>;
 
@@ -16,7 +17,7 @@ interface SettingsFormProps {
 const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
   ({ settings, dataPageTitle }, ref) => {
     const [formSettings, setFormSettings] = React.useState<SettingsFormSettings>({
-      tagsListString: settings.tagsListString,
+      deckConfigs: settings.deckConfigs,
       dataPageTitle: settings.dataPageTitle,
       dailyLimit: settings.dailyLimit,
       forgotReinsertOffset: settings.forgotReinsertOffset,
@@ -34,7 +35,7 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
 
     React.useEffect(() => {
       setFormSettings({
-        tagsListString: settings.tagsListString,
+        deckConfigs: settings.deckConfigs,
         dataPageTitle: settings.dataPageTitle,
         dailyLimit: settings.dailyLimit,
         forgotReinsertOffset: settings.forgotReinsertOffset,
@@ -46,7 +47,7 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
         autoCollapseBlocks: settings.autoCollapseBlocks,
       });
     }, [
-      settings.tagsListString,
+      settings.deckConfigs,
       settings.dataPageTitle,
       settings.dailyLimit,
       settings.forgotReinsertOffset,
@@ -62,19 +63,11 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
       <>
         <div style={{ marginBottom: '20px' }}>
           <h5 style={{ margin: '0 0 10px 0' }}>Tag Pages (Decks)</h5>
-          <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-            Separate multiple decks with commas. Example: &quot;memo, sr, 🐘, french exam&quot;
-          </p>
-          <input
-            type="text"
-            className="bp3-input"
-            value={formSettings.tagsListString}
-            onChange={(e) => {
-              const value = e.target.value;
-              setFormSettings((prev) => ({ ...prev, tagsListString: value }));
+          <DeckConfigsTable
+            deckConfigs={formSettings.deckConfigs}
+            onChange={(value) => {
+              setFormSettings((prev) => ({ ...prev, deckConfigs: value }));
             }}
-            placeholder="memo"
-            style={{ width: '100%' }}
           />
         </div>
 
@@ -99,9 +92,7 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
         <div style={{ marginBottom: '20px' }}>
           <h5 style={{ margin: '0 0 10px 0' }}>Daily Review Limit</h5>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-            Number of cards to review each day. 0 means no limit. When set (&gt;0), each
-            deck&apos;s limit = this value × deck weight %. Adjust deck weights via the gear
-            icon next to each deck.
+            Number of cards to review each day. 0 means no limit.
           </p>
           <input
             type="number"

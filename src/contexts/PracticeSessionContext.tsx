@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Settings } from '~/hooks/useSettings';
 import { Records, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
-import { Today, RenderMode } from '~/models/practice';
+import { Today } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
 import { useSafeContext } from '~/hooks/useSafeContext';
 
@@ -17,8 +17,6 @@ export interface PracticeSessionContextValue {
   handleMemoTagChange: (tag: string) => void;
   fetchPracticeData: () => void;
   dataPageTitle: string;
-  setRenderMode: (tag: string, mode: RenderMode) => void;
-  setDeckWeight: (tag: string, weight: number, tagsList: string[]) => void;
   updateSetting: (key: keyof Settings, value: any) => void;
   algorithm?: SchedulingAlgorithm;
   interaction?: InteractionStyle;
@@ -42,8 +40,6 @@ interface PracticeSessionProviderProps {
   handleMemoTagChange: (tag: string) => void;
   fetchPracticeData: () => void;
   dataPageTitle: string;
-  setRenderMode: (tag: string, mode: RenderMode) => void;
-  setDeckWeight: (tag: string, weight: number, tagsList: string[]) => void;
   updateSetting: (key: keyof Settings, value: any) => void;
   children: React.ReactNode;
 }
@@ -60,8 +56,6 @@ export const PracticeSessionProvider = ({
   handleMemoTagChange,
   fetchPracticeData,
   dataPageTitle,
-  setRenderMode,
-  setDeckWeight,
   updateSetting,
   children,
 }: PracticeSessionProviderProps) => {
@@ -78,8 +72,6 @@ export const PracticeSessionProvider = ({
       handleMemoTagChange,
       fetchPracticeData,
       dataPageTitle,
-      setRenderMode,
-      setDeckWeight,
       updateSetting,
     }),
     [
@@ -94,8 +86,6 @@ export const PracticeSessionProvider = ({
       handleMemoTagChange,
       fetchPracticeData,
       dataPageTitle,
-      setRenderMode,
-      setDeckWeight,
       updateSetting,
     ]
   );
