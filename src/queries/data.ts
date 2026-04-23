@@ -485,7 +485,7 @@ const limitRemainingPracticeData = ({
   for (const tag of tagsList) {
     if (tag === DAILYNOTE_DECK_KEY) continue;
     if (tag in weightMap) {
-      deckCaps[tag] = Math.ceil(dailyLimit * (weightMap[tag] / 100));
+      deckCaps[tag] = Math.floor(dailyLimit * (weightMap[tag] / 100));
     }
   }
 
