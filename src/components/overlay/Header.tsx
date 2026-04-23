@@ -1,4 +1,3 @@
-import * as React from 'react';
 import * as Blueprint from '@blueprintjs/core';
 import * as BlueprintSelect from '@blueprintjs/select';
 import styled from '@emotion/styled';

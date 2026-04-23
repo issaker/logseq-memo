@@ -16,7 +16,7 @@ interface SettingsFormProps {
 }
 
 const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
-  ({ settings, dataPageTitle }, ref) => {
+  ({ settings, dataPageTitle: _dataPageTitle }, ref) => {
     const [formSettings, setFormSettings] = React.useState<SettingsFormSettings>({
       deckConfigs: settings.deckConfigs,
       dataPageTitle: settings.dataPageTitle,
@@ -65,7 +65,7 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
         <div style={{ marginBottom: '20px' }}>
           <h5 style={{ margin: '0 0 10px 0' }}>Tag Pages (Decks)</h5>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 8px 0' }}>
-            Each deck's Weight % determines its share of the daily review limit. All weights sum to 100%. Set a deck's weight to 0 to disable its review quota.
+            Each deck&apos;s Weight % determines its share of the daily review limit. All weights sum to 100%. Set a deck&apos;s weight to 0 to disable its review quota.
           </p>
           <DeckConfigsTable
             deckConfigs={formSettings.deckConfigs}

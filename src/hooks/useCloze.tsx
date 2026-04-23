@@ -16,7 +16,7 @@ function getAllTextNodes(element: Element) {
 }
 
 function wrapMatches(node: Element, regex: RegExp) {
-  let textNodes = getAllTextNodes(node);
+  const textNodes = getAllTextNodes(node);
 
   for (let i = 0; i < textNodes.length; ) {
     const textNode = textNodes[i];

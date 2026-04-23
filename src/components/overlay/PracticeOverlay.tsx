@@ -142,9 +142,11 @@ const PracticeOverlay = ({
   } = settings;
   const todaySelectedTag = today.tags[selectedTag];
 
-  const newCardsUids = todaySelectedTag?.newUids || [];
-  const dueCardsUids = todaySelectedTag?.dueUids || [];
-  const initialCardUids = [...dueCardsUids, ...newCardsUids];
+  const initialCardUids = React.useMemo(() => {
+    const newUids = todaySelectedTag?.newUids || [];
+    const dueUids = todaySelectedTag?.dueUids || [];
+    return [...dueUids, ...newUids];
+  }, [todaySelectedTag]);
   const renderMode = todaySelectedTag?.renderMode;
 
   const [cardQueue, setCardQueue] = React.useState<string[]>(initialCardUids);
@@ -365,7 +367,7 @@ const PracticeOverlay = ({
   React.useEffect(() => {
     setCardQueue(initialCardUids);
     setCurrentIndex(0);
-  }, [selectedTag]);
+  }, [selectedTag, initialCardUids]);
 
   // When today data loads and initialCardUids becomes available, sync cardQueue
   const initialCardUidsLengthRef = React.useRef(initialCardUids.length);
@@ -378,7 +380,7 @@ const PracticeOverlay = ({
       setCardQueue(initialCardUids);
       setCurrentIndex(0);
     }
-  }, [todaySelectedTag]);
+  }, [todaySelectedTag, initialCardUids]);
 
   const onPracticeClick = React.useCallback(
     (gradeData) => {
@@ -458,6 +460,7 @@ const PracticeOverlay = ({
       isLineByLineActive,
       lineByLineIsCardComplete,
       onLineByLineGrade,
+      currentIndex,
     ]
   );
 
@@ -497,7 +500,7 @@ const PracticeOverlay = ({
         onKeyDown: toggleBreadcrumbs,
       },
     ],
-    [showBreadcrumbs]
+    [toggleBreadcrumbs]
   );
   Blueprint.useHotkeys(hotkeys);
 

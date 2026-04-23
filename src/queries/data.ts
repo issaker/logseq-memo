@@ -585,7 +585,6 @@ const limitRemainingPracticeData = ({
   let totalAllocated = dueSelected + newSelected;
   if (totalAllocated < remainingLimit) {
     let unused = remainingLimit - totalAllocated;
-    const newNeeded = Math.max(0, targetNew - newSelected);
 
     while (unused > 0 && newSelected < targetNew) {
       let addedInThisRound = false;

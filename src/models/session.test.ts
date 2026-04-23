@@ -1,6 +1,5 @@
 import {
   SchedulingAlgorithm,
-  FixedTimeUnit,
   InteractionStyle,
   isFixedTimeAlgorithm,
   isGradingAlgorithm,

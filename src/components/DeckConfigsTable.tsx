@@ -61,7 +61,7 @@ const WeightInput = styled.input`
   width: 75px;
 `;
 
-const DeckConfigsTable: React.FC<DeckConfigsTableProps> = ({ deckConfigs, onChange, dailynoteEnabled }) => {
+const DeckConfigsTable: React.FC<DeckConfigsTableProps> = ({ deckConfigs, onChange, dailynoteEnabled: _dailynoteEnabled }) => {
   const isDailyNote = (name: string) => name === DAILYNOTE_DECK_KEY;
 
   const [decks, setDecks] = React.useState<DeckConfig[]>(() => {

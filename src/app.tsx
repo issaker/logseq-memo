@@ -47,7 +47,7 @@ const App = () => {
   } = settings;
   const { selectedTag, setSelectedTag, tagsList } = useTags({ deckConfigs });
 
-  const { fetchCacheData, saveCacheData, data: cachedData } = useCachedData({ dataPageTitle });
+  const { fetchCacheData, data: cachedData } = useCachedData({ dataPageTitle });
 
   const { practiceData, today, fetchPracticeData } = usePracticeData({
     tagsList,
@@ -60,9 +60,14 @@ const App = () => {
     deckConfigs,
   });
 
+  const refreshData = React.useCallback(() => {
+    fetchCacheData();
+    fetchPracticeData();
+  }, [fetchCacheData, fetchPracticeData]);
+
   React.useEffect(() => {
     refreshData();
-  }, [deckConfigs]);
+  }, [deckConfigs, refreshData]);
 
   const handlePracticeClick = async ({ refUid, ...cardData }: handlePracticeProps) => {
     if (!refUid) {
@@ -81,11 +86,6 @@ const App = () => {
     } catch (error) {
       console.error('Error Saving Practice Data', error);
     }
-  };
-
-  const refreshData = () => {
-    fetchCacheData();
-    fetchPracticeData();
   };
 
   useOnVisibilityStateChange(() => {
@@ -116,7 +116,6 @@ const App = () => {
 
   useCollapseReferenceList({ dataPageTitle });
 
-  const [tagsOnEnter, setTagsOnEnter] = React.useState<string[]>([]);
   const tagsOnEnterRef = React.useRef<string[]>([]);
   const tagsListRef = React.useRef(tagsList);
   const showPracticeOverlayRef = React.useRef(showPracticeOverlay);
@@ -136,7 +135,6 @@ const App = () => {
 
   const onBlockEnterHandler = (elm: HTMLTextAreaElement) => {
     const tags = tagsListRef.current.filter((tag) => elm.value.includes(tag));
-    setTagsOnEnter(tags);
     tagsOnEnterRef.current = tags;
   };
   const onBlockLeaveHandler = (elm: HTMLTextAreaElement) => {

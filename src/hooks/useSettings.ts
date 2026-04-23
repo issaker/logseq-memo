@@ -106,7 +106,7 @@ const useSettings = () => {
     window.roamMemo.extensionAPI.settings.panel.create(
       settingsPanelConfig({ settings, setSettings })
     );
-  }, [setSettings]);
+  }, [setSettings, settings]);
 
   // One-time startup: load page data into extensionAPI if it's empty (roam/js cold start)
   const syncPageToExtensionAPI = React.useCallback(

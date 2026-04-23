@@ -64,7 +64,7 @@ const CardBlock = ({
 
   // Set up the debounced function only once when the component mounts
   React.useEffect(() => {
-    // Define the function to be debounced
+    const registeredTextareas = registeredTextareasRef.current;
     const renderBlock = async () => {
       const currentRefUid = refUidRef.current;
       if (!ref.current) return;
@@ -125,18 +125,17 @@ const CardBlock = ({
     return () => {
       debouncedFnRef.current = null;
 
-      // 清理已注册的 blur 事件监听器，防止内存泄漏
-      registeredTextareasRef.current.forEach((textarea) => {
+      registeredTextareas.forEach((textarea) => {
         textarea.removeEventListener('blur', handleBlockBlur);
       });
-      registeredTextareasRef.current.clear();
+      registeredTextareasRef.current = new Set();
 
       if (observerRef.current) {
         observerRef.current.disconnect();
         observerRef.current = null;
       }
     };
-  }, [handleBlockBlur]);
+  }, [handleBlockBlur, onRenderComplete]);
 
   // Call the debounced function when refUid changes
   React.useEffect(() => {

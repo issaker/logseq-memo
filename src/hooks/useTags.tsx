@@ -22,7 +22,7 @@ const useTags = ({ deckConfigs }: { deckConfigs: string }) => {
     if (!newList.includes(selectedTag)) {
       setSelectedTag(newList[0]);
     }
-  }, [deckConfigs, buildTagsList]);
+  }, [deckConfigs, buildTagsList, selectedTag]);
 
   return {
     selectedTag,
