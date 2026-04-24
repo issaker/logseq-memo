@@ -288,13 +288,28 @@ const PracticeOverlay = ({
 
   const [childSessionData, setChildSessionData] = React.useState<Record<string, Session>>({});
 
+  const prevCardRefUidForChildDataRef = React.useRef<string | undefined>(currentCardRefUid);
+
   React.useEffect(() => {
     if (!isLineByLineActive || !childUidsList.length || !dataPageTitle) {
-      setChildSessionData({});
       return;
     }
+
+    const cardChanged = prevCardRefUidForChildDataRef.current !== currentCardRefUid;
+    prevCardRefUidForChildDataRef.current = currentCardRefUid;
+
+    if (!cardChanged) return;
+
     getChildSessionData({ childUids: childUidsList, dataPageTitle }).then((data) => {
-      setChildSessionData(data as Record<string, Session>);
+      setChildSessionData((prev) => {
+        const merged = { ...data };
+        for (const uid of Object.keys(prev)) {
+          if (childUidsList.includes(uid) && !merged[uid]) {
+            merged[uid] = prev[uid];
+          }
+        }
+        return merged;
+      });
     });
   }, [isLineByLineActive, childUidsList, dataPageTitle, currentCardRefUid]);
 
