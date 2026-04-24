@@ -118,6 +118,8 @@ export default function useLineByLineReview({
 }: UseLineByLineReviewInput): UseLineByLineReviewOutput {
   const [lineByLineRevealedCount, setLineByLineRevealedCount] = React.useState(0);
   const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);
+  const lineByLineCurrentChildIndexRef = React.useRef(lineByLineCurrentChildIndex);
+  lineByLineCurrentChildIndexRef.current = lineByLineCurrentChildIndex;
 
   const currentChildAlgorithm = React.useMemo(() => {
     if (!isLBLReviewMode || !childUidsList.length || lineByLineCurrentChildIndex >= childUidsList.length) {
@@ -346,9 +348,10 @@ export default function useLineByLineReview({
   }, [setShowAnswers]);
 
   const onLineByLineUp = React.useCallback(() => {
-    if (lineByLineCurrentChildIndex <= 0) return;
+    const currentIndex = lineByLineCurrentChildIndexRef.current;
+    if (currentIndex <= 0) return;
 
-    const prevIndex = lineByLineCurrentChildIndex - 1;
+    const prevIndex = currentIndex - 1;
     const prevChildUid = childUidsList[prevIndex];
     const prevChildSession = childSessionData[prevChildUid];
     const prevChildAlgorithm = prevChildSession?.algorithm || algorithm;
@@ -358,7 +361,6 @@ export default function useLineByLineReview({
     setLineByLineRevealedCount((prev) => Math.max(prev, prevIndex + 1));
     setShowAnswers(isTargetLblNext);
   }, [
-    lineByLineCurrentChildIndex,
     childUidsList,
     childSessionData,
     algorithm,
@@ -367,9 +369,10 @@ export default function useLineByLineReview({
   ]);
 
   const onLineByLineDown = React.useCallback(() => {
-    if (lineByLineCurrentChildIndex >= childUidsList.length - 1) return;
+    const currentIndex = lineByLineCurrentChildIndexRef.current;
+    if (currentIndex >= childUidsList.length - 1) return;
 
-    const nextIndex = lineByLineCurrentChildIndex + 1;
+    const nextIndex = currentIndex + 1;
     const nextChildUid = childUidsList[nextIndex];
     const nextChildSession = childSessionData[nextChildUid];
     const nextChildAlgorithm = nextChildSession?.algorithm || algorithm;
@@ -379,7 +382,6 @@ export default function useLineByLineReview({
     setLineByLineRevealedCount((prev) => Math.max(prev, nextIndex + 1));
     setShowAnswers(isTargetLblNext);
   }, [
-    lineByLineCurrentChildIndex,
     childUidsList,
     childSessionData,
     algorithm,

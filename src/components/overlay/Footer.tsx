@@ -248,7 +248,7 @@ const Footer = ({
             onLineByLineDown={onLineByLineDown}
           />
         ) : !showAnswers ? (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center gap-3">
             {isLineByLine && (
               <LblUpDownControls onLineByLineUp={onLineByLineUp} onLineByLineDown={onLineByLineDown} />
             )}

@@ -338,20 +338,16 @@ const PracticeOverlay = ({
     const effectiveInteraction = (latestSession?.interaction || interaction) as InteractionStyle | undefined;
     const effectiveIsLBL = isLBLReviewMode(effectiveInteraction) && hasBlockChildrenUids;
 
-    if (effectiveIsLBL) {
-      if (currentChildIsLblNext) {
+    if (!effectiveIsLBL) {
+      if (!isGradingAlgorithm(algorithm)) {
         setShowAnswers(true);
-      } else {
+      } else if (hasBlockChildren || hasCloze) {
         setShowAnswers(false);
+      } else {
+        setShowAnswers(true);
       }
-    } else if (!isGradingAlgorithm(algorithm)) {
-      setShowAnswers(true);
-    } else if (hasBlockChildren || hasCloze) {
-      setShowAnswers(false);
-    } else {
-      setShowAnswers(true);
     }
-  }, [hasBlockChildren, hasCloze, hasBlockChildrenUids, algorithm, interaction, currentCardRefUid, latestSession, currentChildIsLblNext]);
+  }, [hasBlockChildren, hasCloze, hasBlockChildrenUids, algorithm, interaction, currentCardRefUid, latestSession]);
 
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
