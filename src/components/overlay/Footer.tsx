@@ -43,15 +43,13 @@ const Footer = ({
   onPracticeClick,
   onSkipClick,
   onPrevClick,
-  onLineByLineUp,
-  onLineByLineDown,
   isDone,
   hasCards,
   onCloseCallback,
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete } = React.useContext(MainContext);
+  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext } = React.useContext(MainContext);
   const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
@@ -149,14 +147,22 @@ const Footer = ({
         combo: 'up',
         global: true,
         label: 'Previous Line',
-        onKeyDown: onLineByLineUp,
+        onKeyDown: () => {
+          if (isLineByLine && onLineByLinePrev) {
+            onLineByLinePrev();
+          }
+        },
         disabled: !isLineByLine,
       },
       {
         combo: 'down',
         global: true,
         label: 'Next Line',
-        onKeyDown: onLineByLineDown,
+        onKeyDown: () => {
+          if (isLineByLine && onLineByLineNext) {
+            onLineByLineNext();
+          }
+        },
         disabled: !isLineByLine,
       },
       {
@@ -188,7 +194,7 @@ const Footer = ({
         disabled: !isFixedTimeAlgorithm(algorithmFromSession),
       },
     ],
-    [skipFn, onPrevClick, onLineByLineUp, onLineByLineDown, isLineByLine, showAnswers, showAnswerFn, intervalPractice, gradeFn, algorithmFromSession]
+    [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn, algorithmFromSession, isLineByLine, onLineByLinePrev, onLineByLineNext]
   );
   const { handleKeyDown, handleKeyUp } = Blueprint.useHotkeys(hotkeys);
 
@@ -244,20 +250,15 @@ const Footer = ({
           <LblCompletedControls
             onPrevClick={onPrevClick}
             onNextClick={skipFn}
-            onLineByLineUp={onLineByLineUp}
-            onLineByLineDown={onLineByLineDown}
+            onLineByLinePrev={onLineByLinePrev}
+            onLineByLineNext={onLineByLineNext}
           />
         ) : !showAnswers ? (
-          <div className="flex items-center justify-center gap-3">
-            {isLineByLine && (
-              <LblUpDownControls onLineByLineUp={onLineByLineUp} onLineByLineDown={onLineByLineDown} />
-            )}
-            <AnswerHiddenControls
-              activateButtonFn={activateButtonFn}
-              showAnswerFn={showAnswerFn}
-              activeButtonKey={activeButtonKey}
-            />
-          </div>
+          <AnswerHiddenControls
+            activateButtonFn={activateButtonFn}
+            showAnswerFn={showAnswerFn}
+            activeButtonKey={activeButtonKey}
+          />
         ) : (
           <GradingControlsWrapper
             activeButtonKey={activeButtonKey}
@@ -268,8 +269,6 @@ const Footer = ({
             isIntervalEditorOpen={isIntervalEditorOpen}
             toggleIntervalEditorOpen={toggleIntervalEditorOpen}
             onPrevClick={onPrevClick}
-            onLineByLineUp={onLineByLineUp}
-            onLineByLineDown={onLineByLineDown}
           />
         )}
       </FooterActionsWrapper>
@@ -319,56 +318,8 @@ const FinishedControls = ({ onStartCrammingClick, onCloseCallback }) => {
   );
 };
 
-const LblUpDownControls = ({ onLineByLineUp, onLineByLineDown }) => (
-  <>
-    <button
-      type="button"
-      aria-label="Previous line"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onLineByLineUp();
-      }}
-      className="bp3-button bp3-minimal"
-      style={{
-        minWidth: '44px',
-        minHeight: '44px',
-        padding: '0 10px',
-        fontSize: '18px',
-        lineHeight: 1,
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      ▲
-    </button>
-    <button
-      type="button"
-      aria-label="Next line"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onLineByLineDown();
-      }}
-      className="bp3-button bp3-minimal"
-      style={{
-        minWidth: '44px',
-        minHeight: '44px',
-        padding: '0 10px',
-        fontSize: '18px',
-        lineHeight: 1,
-        touchAction: 'manipulation',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      ▼
-    </button>
-  </>
-);
-
-const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLineUp, onLineByLineDown }) => (
+const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLinePrev, onLineByLineNext: _onLineByLineNext }) => (
   <div className="flex items-center gap-3">
-    <LblUpDownControls onLineByLineUp={onLineByLineUp} onLineByLineDown={onLineByLineDown} />
     <button
       type="button"
       aria-label="Previous"
@@ -390,7 +341,46 @@ const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLineUp, onLine
     >
       ◀
     </button>
+    <button
+      type="button"
+      aria-label="Previous Line"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onLineByLinePrev?.();
+      }}
+      className="bp3-button bp3-minimal"
+      style={{
+        minWidth: '44px',
+        minHeight: '44px',
+        padding: '0 10px',
+        fontSize: '18px',
+        lineHeight: 1,
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      ▲
+    </button>
     <span className="text-sm opacity-60">All lines reviewed</span>
+    <button
+      type="button"
+      aria-label="Next Line"
+      disabled
+      className="bp3-button bp3-minimal"
+      style={{
+        minWidth: '44px',
+        minHeight: '44px',
+        padding: '0 10px',
+        fontSize: '18px',
+        lineHeight: 1,
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+        opacity: 0.3,
+      }}
+    >
+      ▼
+    </button>
     <button
       type="button"
       aria-label="Next"
@@ -424,20 +414,14 @@ const GradingControlsWrapper = ({
   isIntervalEditorOpen,
   toggleIntervalEditorOpen,
   onPrevClick,
-  onLineByLineUp,
-  onLineByLineDown,
 }) => {
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
-  const { isLineByLine, currentChildAlgorithm, currentChildIsLblNext } = React.useContext(MainContext);
 
-  const effectiveAlgorithm = isLineByLine ? (currentChildAlgorithm || algorithm) : algorithm;
-  const isAutoAdvanceMode = !isGradingAlgorithm(effectiveAlgorithm);
-  const isLblNextActive = isLBLReviewMode(interaction) && (isLineByLine ? currentChildIsLblNext : false);
+  const isAutoAdvanceMode = !isGradingAlgorithm(algorithm);
+  const { isLineByLine, onLineByLinePrev, onLineByLineNext, currentChildIsLblNext } = React.useContext(MainContext);
+  const isLblNextActive = isLBLReviewMode(interaction) && currentChildIsLblNext;
   return (
-    <div className="flex items-center flex-wrap justify-center gap-3 w-full">
-      {isLineByLine && (
-        <LblUpDownControls onLineByLineUp={onLineByLineUp} onLineByLineDown={onLineByLineDown} />
-      )}
+    <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
         type="button"
         aria-label="Previous"
@@ -480,6 +464,52 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
+      {isLineByLine && (
+        <>
+          <button
+            type="button"
+            aria-label="Previous Line"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onLineByLinePrev?.();
+            }}
+            className="bp3-button bp3-minimal"
+            style={{
+              minWidth: '44px',
+              minHeight: '44px',
+              padding: '0 10px',
+              fontSize: '18px',
+              lineHeight: 1,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            ▲
+          </button>
+          <button
+            type="button"
+            aria-label="Next Line"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onLineByLineNext?.();
+            }}
+            className="bp3-button bp3-minimal"
+            style={{
+              minWidth: '44px',
+              minHeight: '44px',
+              padding: '0 10px',
+              fontSize: '18px',
+              lineHeight: 1,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            ▼
+          </button>
+        </>
+      )}
       {isLblNextActive ? (
         <LblNextControls
           activeButtonKey={activeButtonKey}

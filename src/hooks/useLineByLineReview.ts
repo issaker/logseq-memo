@@ -92,10 +92,10 @@ interface UseLineByLineReviewOutput {
   dueChildCount: number;
   onLineByLineGrade: (grade: number) => void;
   onLineByLineShowAnswer: () => void;
-  onLineByLineUp: () => void;
-  onLineByLineDown: () => void;
   currentChildAlgorithm: SchedulingAlgorithm;
   currentChildIsLblNext: boolean;
+  onLineByLinePrev: () => void;
+  onLineByLineNext: () => void;
 }
 
 export default function useLineByLineReview({
@@ -118,8 +118,6 @@ export default function useLineByLineReview({
 }: UseLineByLineReviewInput): UseLineByLineReviewOutput {
   const [lineByLineRevealedCount, setLineByLineRevealedCount] = React.useState(0);
   const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);
-  const lineByLineCurrentChildIndexRef = React.useRef(lineByLineCurrentChildIndex);
-  lineByLineCurrentChildIndexRef.current = lineByLineCurrentChildIndex;
 
   const currentChildAlgorithm = React.useMemo(() => {
     if (!isLBLReviewMode || !childUidsList.length || lineByLineCurrentChildIndex >= childUidsList.length) {
@@ -347,47 +345,19 @@ export default function useLineByLineReview({
     setShowAnswers(true);
   }, [setShowAnswers]);
 
-  const onLineByLineUp = React.useCallback(() => {
-    const currentIndex = lineByLineCurrentChildIndexRef.current;
-    if (currentIndex <= 0) return;
+  const onLineByLinePrev = React.useCallback(() => {
+    if (lineByLineCurrentChildIndex <= 0) return;
+    const newIndex = lineByLineCurrentChildIndex - 1;
+    setLineByLineCurrentChildIndex(newIndex);
+    setLineByLineRevealedCount((prev) => Math.max(prev, newIndex + 1));
+  }, [lineByLineCurrentChildIndex]);
 
-    const prevIndex = currentIndex - 1;
-    const prevChildUid = childUidsList[prevIndex];
-    const prevChildSession = childSessionData[prevChildUid];
-    const prevChildAlgorithm = prevChildSession?.algorithm || algorithm;
-    const isTargetLblNext = !isGradingAlgorithm(prevChildAlgorithm);
-
-    setLineByLineCurrentChildIndex(prevIndex);
-    setLineByLineRevealedCount((prev) => Math.max(prev, prevIndex + 1));
-    setShowAnswers(isTargetLblNext);
-  }, [
-    childUidsList,
-    childSessionData,
-    algorithm,
-    setLineByLineCurrentChildIndex,
-    setShowAnswers,
-  ]);
-
-  const onLineByLineDown = React.useCallback(() => {
-    const currentIndex = lineByLineCurrentChildIndexRef.current;
-    if (currentIndex >= childUidsList.length - 1) return;
-
-    const nextIndex = currentIndex + 1;
-    const nextChildUid = childUidsList[nextIndex];
-    const nextChildSession = childSessionData[nextChildUid];
-    const nextChildAlgorithm = nextChildSession?.algorithm || algorithm;
-    const isTargetLblNext = !isGradingAlgorithm(nextChildAlgorithm);
-
-    setLineByLineCurrentChildIndex(nextIndex);
-    setLineByLineRevealedCount((prev) => Math.max(prev, nextIndex + 1));
-    setShowAnswers(isTargetLblNext);
-  }, [
-    childUidsList,
-    childSessionData,
-    algorithm,
-    setLineByLineCurrentChildIndex,
-    setShowAnswers,
-  ]);
+  const onLineByLineNext = React.useCallback(() => {
+    if (lineByLineCurrentChildIndex >= childUidsList.length - 1) return;
+    const newIndex = lineByLineCurrentChildIndex + 1;
+    setLineByLineCurrentChildIndex(newIndex);
+    setLineByLineRevealedCount((prev) => Math.max(prev, newIndex + 1));
+  }, [lineByLineCurrentChildIndex, childUidsList.length]);
 
   return {
     lineByLineRevealedCount,
@@ -396,9 +366,9 @@ export default function useLineByLineReview({
     dueChildCount,
     onLineByLineGrade,
     onLineByLineShowAnswer,
-    onLineByLineUp,
-    onLineByLineDown,
     currentChildAlgorithm,
     currentChildIsLblNext,
+    onLineByLinePrev,
+    onLineByLineNext,
   };
 }

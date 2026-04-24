@@ -100,6 +100,8 @@ interface MainContextProps {
   currentChildAlgorithm: SchedulingAlgorithm | undefined;
   currentChildIsLblNext: boolean;
   lineByLineIsCardComplete: boolean;
+  onLineByLinePrev: (() => void) | undefined;
+  onLineByLineNext: (() => void) | undefined;
 }
 
 // 稳定引用：避免内联函数导致 React.memo 失效
@@ -293,8 +295,8 @@ const PracticeOverlay = ({
     dueChildCount,
     onLineByLineGrade,
     onLineByLineShowAnswer,
-    onLineByLineUp,
-    onLineByLineDown,
+    onLineByLinePrev,
+    onLineByLineNext,
     currentChildAlgorithm,
     currentChildIsLblNext,
   } = useLineByLineReview({
@@ -338,16 +340,27 @@ const PracticeOverlay = ({
     const effectiveInteraction = (latestSession?.interaction || interaction) as InteractionStyle | undefined;
     const effectiveIsLBL = isLBLReviewMode(effectiveInteraction) && hasBlockChildrenUids;
 
-    if (!effectiveIsLBL) {
-      if (!isGradingAlgorithm(algorithm)) {
+    if (effectiveIsLBL) {
+      if (lineByLineIsCardComplete) {
         setShowAnswers(true);
-      } else if (hasBlockChildren || hasCloze) {
-        setShowAnswers(false);
       } else {
-        setShowAnswers(true);
+        const currentChildUid = childUidsList[lineByLineCurrentChildIndex];
+        const childSession = currentChildUid ? childSessionData[currentChildUid] : undefined;
+        const isChildMastered = childSession && childSession.nextDueDate && childSession.nextDueDate > new Date();
+        if (isChildMastered || currentChildIsLblNext) {
+          setShowAnswers(true);
+        } else {
+          setShowAnswers(false);
+        }
       }
+    } else if (!isGradingAlgorithm(algorithm)) {
+      setShowAnswers(true);
+    } else if (hasBlockChildren || hasCloze) {
+      setShowAnswers(false);
+    } else {
+      setShowAnswers(true);
     }
-  }, [hasBlockChildren, hasCloze, hasBlockChildrenUids, algorithm, interaction, currentCardRefUid, latestSession]);
+  }, [hasBlockChildren, hasCloze, hasBlockChildrenUids, algorithm, interaction, currentCardRefUid, latestSession, currentChildIsLblNext, lineByLineCurrentChildIndex, childSessionData, childUidsList, lineByLineIsCardComplete]);
 
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
@@ -709,7 +722,9 @@ const PracticeOverlay = ({
     currentChildAlgorithm: isLineByLineActive ? currentChildAlgorithm : undefined,
     currentChildIsLblNext: isLineByLineActive ? currentChildIsLblNext : false,
     lineByLineIsCardComplete: isLineByLineActive ? lineByLineIsCardComplete : false,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete]);
+    onLineByLinePrev: isLineByLineActive ? onLineByLinePrev : undefined,
+    onLineByLineNext: isLineByLineActive ? onLineByLineNext : undefined,
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext]);
 
   if (!todaySelectedTag) {
     return null;
@@ -809,8 +824,6 @@ const PracticeOverlay = ({
           onPracticeClick={onPracticeClick}
           onSkipClick={onSkipClick}
           onPrevClick={onPrevClick}
-          onLineByLineUp={onLineByLineUp}
-          onLineByLineDown={onLineByLineDown}
           setShowAnswers={
             isLineByLineActive && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers
           }
