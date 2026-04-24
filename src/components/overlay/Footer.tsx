@@ -320,7 +320,7 @@ const FinishedControls = ({ onStartCrammingClick, onCloseCallback }) => {
 };
 
 const LblUpDownControls = ({ onLineByLineUp, onLineByLineDown }) => (
-  <div className="flex items-center gap-1">
+  <>
     <button
       type="button"
       aria-label="Previous line"
@@ -363,7 +363,7 @@ const LblUpDownControls = ({ onLineByLineUp, onLineByLineDown }) => (
     >
       ▼
     </button>
-  </div>
+  </>
 );
 
 const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLineUp, onLineByLineDown }) => (
@@ -428,46 +428,45 @@ const GradingControlsWrapper = ({
   onLineByLineDown,
 }) => {
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
-  const { isLineByLine } = React.useContext(MainContext);
+  const { isLineByLine, currentChildAlgorithm, currentChildIsLblNext } = React.useContext(MainContext);
 
-  const isAutoAdvanceMode = !isGradingAlgorithm(algorithm);
-  const { currentChildIsLblNext } = React.useContext(MainContext);
-  const isLblNextActive = isLBLReviewMode(interaction) && currentChildIsLblNext;
+  const effectiveAlgorithm = isLineByLine ? (currentChildAlgorithm || algorithm) : algorithm;
+  const isAutoAdvanceMode = !isGradingAlgorithm(effectiveAlgorithm);
+  const isLblNextActive = isLBLReviewMode(interaction) && (isLineByLine ? currentChildIsLblNext : false);
   return (
-    <div className="flex items-center flex-wrap justify-center gap-x-2 w-full">
-      <div className="flex items-center gap-x-1">
-        {isLineByLine && (
-          <LblUpDownControls onLineByLineUp={onLineByLineUp} onLineByLineDown={onLineByLineDown} />
-        )}
-        <button
-          type="button"
-          aria-label="Previous"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onPrevClick();
-          }}
-          className="bp3-button bp3-minimal"
-          style={{
-            minWidth: '44px',
-            minHeight: '44px',
-            padding: '0 10px',
-            fontSize: '18px',
-            lineHeight: 1,
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          ◀
-        </button>
-        <button
-          type="button"
-          aria-label="Next"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            skipFn();
-          }}
+    <div className="flex items-center flex-wrap justify-center gap-3 w-full">
+      {isLineByLine && (
+        <LblUpDownControls onLineByLineUp={onLineByLineUp} onLineByLineDown={onLineByLineDown} />
+      )}
+      <button
+        type="button"
+        aria-label="Previous"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onPrevClick();
+        }}
+        className="bp3-button bp3-minimal"
+        style={{
+          minWidth: '44px',
+          minHeight: '44px',
+          padding: '0 10px',
+          fontSize: '18px',
+          lineHeight: 1,
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        ◀
+      </button>
+      <button
+        type="button"
+        aria-label="Next"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          skipFn();
+        }}
         className="bp3-button bp3-minimal"
         style={{
           minWidth: '44px',
@@ -481,7 +480,6 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
-      </div>
       {isLblNextActive ? (
         <LblNextControls
           activeButtonKey={activeButtonKey}
