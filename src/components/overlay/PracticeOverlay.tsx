@@ -111,6 +111,7 @@ interface MainContextProps {
   lineByLineIsCardComplete: boolean;
   onLineByLinePrev: (() => void) | undefined;
   onLineByLineNext: (() => void) | undefined;
+  onLineByLineShowAnswer: (() => void) | undefined;
 }
 
 // 稳定引用：避免内联函数导致 React.memo 失效
@@ -357,6 +358,8 @@ const PracticeOverlay = ({
         const childSession = currentChildUid ? childSessionData[currentChildUid] : undefined;
         const isChildMastered = childSession && childSession.nextDueDate && childSession.nextDueDate > new Date();
         if (isChildMastered || currentChildIsLblNext) {
+          setShowAnswers(true);
+        } else if (!childSession && !Object.keys(childSessionData).length) {
           setShowAnswers(true);
         } else {
           setShowAnswers(false);
@@ -742,7 +745,8 @@ const PracticeOverlay = ({
     lineByLineIsCardComplete: isLineByLineActive ? lineByLineIsCardComplete : false,
     onLineByLinePrev: isLineByLineActive ? onLineByLinePrev : undefined,
     onLineByLineNext: isLineByLineActive ? onLineByLineNext : undefined,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext]);
+    onLineByLineShowAnswer: isLineByLineActive ? onLineByLineShowAnswer : undefined,
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext, onLineByLineShowAnswer]);
 
   if (!todaySelectedTag) {
     return null;
@@ -842,12 +846,8 @@ const PracticeOverlay = ({
           onPracticeClick={onPracticeClick}
           onSkipClick={onSkipClick}
           onPrevClick={onPrevClick}
-          setShowAnswers={
-            isLineByLineActive && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers
-          }
-          showAnswers={
-            isLineByLineActive ? (lineByLineIsCardComplete || lineByLineRevealedCount > lineByLineCurrentChildIndex) : showAnswers
-          }
+          setShowAnswers={setShowAnswers}
+          showAnswers={showAnswers}
           isDone={isDone}
           hasCards={hasCards}
           onCloseCallback={onCloseCallback}

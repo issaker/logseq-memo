@@ -49,8 +49,10 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext } = React.useContext(MainContext);
+  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext, onLineByLineShowAnswer } = React.useContext(MainContext);
   const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
+
+  const effectiveAlgorithm = isLineByLine ? (currentChildAlgorithm || algorithmFromSession) : algorithmFromSession;
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
 
@@ -65,9 +67,13 @@ const Footer = ({
 
   const showAnswerFn = React.useMemo(() => {
     return () => {
-      setShowAnswers(true);
+      if (isLineByLine && onLineByLineShowAnswer) {
+        onLineByLineShowAnswer();
+      } else {
+        setShowAnswers(true);
+      }
     };
-  }, [setShowAnswers]);
+  }, [setShowAnswers, isLineByLine, onLineByLineShowAnswer]);
   const gradeFn = React.useMemo(
     () => (grade) => {
       let key;
@@ -117,7 +123,7 @@ const Footer = ({
           if (!showAnswers) {
             activateButtonFn('space-button', showAnswerFn);
           } else {
-            if (!isGradingAlgorithm(algorithmFromSession)) {
+            if (!isGradingAlgorithm(effectiveAlgorithm)) {
               intervalPractice();
             } else {
               gradeFn(5);
@@ -171,31 +177,31 @@ const Footer = ({
         global: true,
         label: 'Grade 0',
         onKeyDown: () => gradeFn(0),
-        disabled: !isGradingAlgorithm(algorithmFromSession),
+        disabled: !isGradingAlgorithm(effectiveAlgorithm),
       },
       {
         combo: 'H',
         global: true,
         label: 'Grade 2',
         onKeyDown: () => gradeFn(2),
-        disabled: !isGradingAlgorithm(algorithmFromSession),
+        disabled: !isGradingAlgorithm(effectiveAlgorithm),
       },
       {
         combo: 'G',
         global: true,
         label: 'Grade 4',
         onKeyDown: () => gradeFn(4),
-        disabled: !isGradingAlgorithm(algorithmFromSession),
+        disabled: !isGradingAlgorithm(effectiveAlgorithm),
       },
       {
         combo: 'E',
         global: true,
         label: 'Edit Interval',
         onKeyDown: toggleIntervalEditorOpen,
-        disabled: !isFixedTimeAlgorithm(algorithmFromSession),
+        disabled: !isFixedTimeAlgorithm(effectiveAlgorithm),
       },
     ],
-    [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn, algorithmFromSession, isLineByLine, onLineByLinePrev, onLineByLineNext]
+    [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn, effectiveAlgorithm, isLineByLine, onLineByLinePrev, onLineByLineNext]
   );
   const { handleKeyDown, handleKeyUp } = Blueprint.useHotkeys(hotkeys);
 
@@ -433,8 +439,9 @@ const GradingControlsWrapper = ({
 }) => {
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
-  const isAutoAdvanceMode = !isGradingAlgorithm(algorithm);
-  const { isLineByLine, onLineByLinePrev, onLineByLineNext, currentChildIsLblNext } = React.useContext(MainContext);
+  const { isLineByLine, onLineByLinePrev, onLineByLineNext, currentChildIsLblNext, currentChildAlgorithm } = React.useContext(MainContext);
+  const effectiveAlgorithm = isLineByLine ? (currentChildAlgorithm || algorithm) : algorithm;
+  const isAutoAdvanceMode = !isGradingAlgorithm(effectiveAlgorithm);
   const isLblNextActive = isLBLReviewMode(interaction) && currentChildIsLblNext;
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
