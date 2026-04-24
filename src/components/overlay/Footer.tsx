@@ -434,39 +434,40 @@ const GradingControlsWrapper = ({
   const { currentChildIsLblNext } = React.useContext(MainContext);
   const isLblNextActive = isLBLReviewMode(interaction) && currentChildIsLblNext;
   return (
-    <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
-      {isLineByLine && (
-        <LblUpDownControls onLineByLineUp={onLineByLineUp} onLineByLineDown={onLineByLineDown} />
-      )}
-      <button
-        type="button"
-        aria-label="Previous"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onPrevClick();
-        }}
-        className="bp3-button bp3-minimal"
-        style={{
-          minWidth: '44px',
-          minHeight: '44px',
-          padding: '0 10px',
-          fontSize: '18px',
-          lineHeight: 1,
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        ◀
-      </button>
-      <button
-        type="button"
-        aria-label="Next"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          skipFn();
-        }}
+    <div className="flex items-center flex-wrap justify-center gap-x-2 w-full">
+      <div className="flex items-center gap-x-1">
+        {isLineByLine && (
+          <LblUpDownControls onLineByLineUp={onLineByLineUp} onLineByLineDown={onLineByLineDown} />
+        )}
+        <button
+          type="button"
+          aria-label="Previous"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onPrevClick();
+          }}
+          className="bp3-button bp3-minimal"
+          style={{
+            minWidth: '44px',
+            minHeight: '44px',
+            padding: '0 10px',
+            fontSize: '18px',
+            lineHeight: 1,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          ◀
+        </button>
+        <button
+          type="button"
+          aria-label="Next"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            skipFn();
+          }}
         className="bp3-button bp3-minimal"
         style={{
           minWidth: '44px',
@@ -480,6 +481,7 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
+      </div>
       {isLblNextActive ? (
         <LblNextControls
           activeButtonKey={activeButtonKey}
