@@ -92,17 +92,10 @@ interface UseLineByLineReviewOutput {
   dueChildCount: number;
   onLineByLineGrade: (grade: number) => void;
   onLineByLineShowAnswer: () => void;
+  onLineByLineNavigateUp: () => void;
+  onLineByLineNavigateDown: () => void;
   currentChildAlgorithm: SchedulingAlgorithm;
   currentChildIsLblNext: boolean;
-  onUndoLineByLineGrade: () => void;
-  canUndoLineByLineGrade: boolean;
-}
-
-interface UndoSnapshot {
-  childUid: string;
-  previousChildSession: Session | undefined;
-  previousLineByLineCurrentChildIndex: number;
-  previousLineByLineRevealedCount: number;
 }
 
 export default function useLineByLineReview({
@@ -125,7 +118,6 @@ export default function useLineByLineReview({
 }: UseLineByLineReviewInput): UseLineByLineReviewOutput {
   const [lineByLineRevealedCount, setLineByLineRevealedCount] = React.useState(0);
   const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);
-  const [undoHistory, setUndoHistory] = React.useState<UndoSnapshot[]>([]);
 
   const currentChildAlgorithm = React.useMemo(() => {
     if (!isLBLReviewMode || !childUidsList.length || lineByLineCurrentChildIndex >= childUidsList.length) {
@@ -149,7 +141,6 @@ export default function useLineByLineReview({
     if (!isLBLReviewMode || !childUidsList.length) {
       setLineByLineRevealedCount(0);
       setLineByLineCurrentChildIndex(0);
-      setUndoHistory([]);
       return;
     }
 
@@ -174,16 +165,6 @@ export default function useLineByLineReview({
       const childUid = childUidsList[lineByLineCurrentChildIndex];
       const existingChildSession = childSessionData[childUid] || generateNewSession({ algorithm: currentChildAlgorithm });
       const now = new Date();
-
-      setUndoHistory((prev) => [
-        ...prev,
-        {
-          childUid,
-          previousChildSession: childSessionData[childUid],
-          previousLineByLineCurrentChildIndex: lineByLineCurrentChildIndex,
-          previousLineByLineRevealedCount: lineByLineRevealedCount,
-        },
-      ]);
 
       if (currentChildIsLblNext) {
         const childPracticeProps = {
@@ -356,7 +337,6 @@ export default function useLineByLineReview({
       setChildSessionData,
       setCardQueue,
       setShowAnswers,
-      lineByLineRevealedCount,
     ]
   );
 
@@ -365,56 +345,54 @@ export default function useLineByLineReview({
     setShowAnswers(true);
   }, [setShowAnswers]);
 
-  const canUndoLineByLineGrade = undoHistory.length > 0;
+  const onLineByLineNavigateUp = React.useCallback(() => {
+    if (lineByLineCurrentChildIndex <= 0) return;
 
-  const onUndoLineByLineGrade = React.useCallback(
-    async () => {
-      if (undoHistory.length === 0) return;
+    let newIndex: number;
+    if (lineByLineIsCardComplete) {
+      newIndex = childUidsList.length - 1;
+    } else {
+      newIndex = lineByLineCurrentChildIndex - 1;
+    }
 
-      const snapshot = undoHistory[undoHistory.length - 1];
-      setUndoHistory((prev) => prev.slice(0, -1));
+    setLineByLineCurrentChildIndex(newIndex);
+    setLineByLineRevealedCount((prev) => Math.max(prev, newIndex + 1));
 
-      if (snapshot.previousChildSession) {
-        await savePracticeData({
-          refUid: snapshot.childUid,
-          dataPageTitle,
-          dateCreated: snapshot.previousChildSession.dateCreated || new Date(),
-          ...snapshot.previousChildSession,
-        });
-      }
+    const targetChildSession = childSessionData[childUidsList[newIndex]];
+    const targetAlgorithm = targetChildSession?.algorithm || algorithm;
+    const now = new Date();
+    const isMastered = targetChildSession?.nextDueDate && targetChildSession.nextDueDate > now;
 
-      await updateParentNextDueDate({
-        refUid: currentCardRefUid!,
-        childUids: childUidsList,
-        dataPageTitle,
-      });
-
-      setChildSessionData((prev) => {
-        const next = { ...prev };
-        if (snapshot.previousChildSession) {
-          next[snapshot.childUid] = snapshot.previousChildSession;
-        } else {
-          delete next[snapshot.childUid];
-        }
-        return next;
-      });
-
-      setSessionOverrides((prev) => {
-        const next = { ...prev };
-        if (snapshot.previousChildSession) {
-          next[snapshot.childUid] = snapshot.previousChildSession;
-        } else {
-          delete next[snapshot.childUid];
-        }
-        return next;
-      });
-
-      setLineByLineCurrentChildIndex(snapshot.previousLineByLineCurrentChildIndex);
-      setLineByLineRevealedCount(snapshot.previousLineByLineRevealedCount);
+    if (isMastered) {
+      setShowAnswers(true);
+    } else if (isGradingAlgorithm(targetAlgorithm)) {
       setShowAnswers(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [undoHistory, dataPageTitle, currentCardRefUid, childUidsList, setChildSessionData, setSessionOverrides, setShowAnswers]
-  );
+    } else {
+      setShowAnswers(true);
+    }
+  }, [lineByLineCurrentChildIndex, lineByLineIsCardComplete, childUidsList, childSessionData, algorithm, setShowAnswers]);
+
+  const onLineByLineNavigateDown = React.useCallback(() => {
+    if (lineByLineCurrentChildIndex >= childUidsList.length - 1) return;
+
+    const newIndex = lineByLineCurrentChildIndex + 1;
+
+    setLineByLineCurrentChildIndex(newIndex);
+    setLineByLineRevealedCount((prev) => Math.max(prev, newIndex + 1));
+
+    const targetChildSession = childSessionData[childUidsList[newIndex]];
+    const targetAlgorithm = targetChildSession?.algorithm || algorithm;
+    const now = new Date();
+    const isMastered = targetChildSession?.nextDueDate && targetChildSession.nextDueDate > now;
+
+    if (isMastered) {
+      setShowAnswers(true);
+    } else if (isGradingAlgorithm(targetAlgorithm)) {
+      setShowAnswers(false);
+    } else {
+      setShowAnswers(true);
+    }
+  }, [lineByLineCurrentChildIndex, childUidsList, childSessionData, algorithm, setShowAnswers]);
 
   return {
     lineByLineRevealedCount,
@@ -423,9 +401,9 @@ export default function useLineByLineReview({
     dueChildCount,
     onLineByLineGrade,
     onLineByLineShowAnswer,
+    onLineByLineNavigateUp,
+    onLineByLineNavigateDown,
     currentChildAlgorithm,
     currentChildIsLblNext,
-    onUndoLineByLineGrade,
-    canUndoLineByLineGrade,
   };
 }

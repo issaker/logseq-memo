@@ -49,7 +49,7 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete, onUndoLineByLineGrade, canUndoLineByLineGrade } = React.useContext(MainContext);
+  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete, onLineByLineNavigateUp, onLineByLineNavigateDown } = React.useContext(MainContext);
   const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
@@ -171,8 +171,22 @@ const Footer = ({
         onKeyDown: toggleIntervalEditorOpen,
         disabled: !isFixedTimeAlgorithm(algorithmFromSession),
       },
+      {
+        combo: 'up',
+        global: true,
+        label: 'Navigate Up',
+        onKeyDown: () => onLineByLineNavigateUp?.(),
+        disabled: !isLineByLine || !onLineByLineNavigateUp,
+      },
+      {
+        combo: 'down',
+        global: true,
+        label: 'Navigate Down',
+        onKeyDown: () => onLineByLineNavigateDown?.(),
+        disabled: !isLineByLine || !onLineByLineNavigateDown,
+      },
     ],
-    [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn, algorithmFromSession]
+    [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn, algorithmFromSession, onLineByLineNavigateUp, onLineByLineNavigateDown, isLineByLine]
   );
   const { handleKeyDown, handleKeyUp } = Blueprint.useHotkeys(hotkeys);
 
@@ -228,8 +242,7 @@ const Footer = ({
           <LblCompletedControls
             onPrevClick={onPrevClick}
             onNextClick={skipFn}
-            onUndoClick={onUndoLineByLineGrade}
-            canUndo={canUndoLineByLineGrade}
+            onLineByLineNavigateUp={onLineByLineNavigateUp}
           />
         ) : !showAnswers ? (
           <AnswerHiddenControls
@@ -296,8 +309,29 @@ const FinishedControls = ({ onStartCrammingClick, onCloseCallback }) => {
   );
 };
 
-const LblCompletedControls = ({ onPrevClick, onNextClick, onUndoClick, canUndo }) => (
+const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLineNavigateUp }) => (
   <div className="flex items-center gap-3">
+    <button
+      type="button"
+      aria-label="Navigate Up"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onLineByLineNavigateUp?.();
+      }}
+      className="bp3-button bp3-minimal"
+      style={{
+        minWidth: '44px',
+        minHeight: '44px',
+        padding: '0 10px',
+        fontSize: '18px',
+        lineHeight: 1,
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      ▲
+    </button>
     <button
       type="button"
       aria-label="Previous"
@@ -319,15 +353,6 @@ const LblCompletedControls = ({ onPrevClick, onNextClick, onUndoClick, canUndo }
     >
       ◀
     </button>
-    <Blueprint.Button
-      className="text-base font-medium py-1"
-      intent="none"
-      onClick={onUndoClick}
-      outlined
-      disabled={!canUndo}
-    >
-      ↩ Undo
-    </Blueprint.Button>
     <span className="text-sm opacity-60">All lines reviewed</span>
     <button
       type="button"
@@ -366,11 +391,34 @@ const GradingControlsWrapper = ({
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
   const isAutoAdvanceMode = !isGradingAlgorithm(algorithm);
-  const { currentChildIsLblNext, onUndoLineByLineGrade, canUndoLineByLineGrade } = React.useContext(MainContext);
+  const { currentChildIsLblNext, isLineByLine, onLineByLineNavigateUp, onLineByLineNavigateDown, lineByLineCurrentIndex, lineByLineTotal } = React.useContext(MainContext);
   const isLblNextActive = isLBLReviewMode(interaction) && currentChildIsLblNext;
-  const isLblMode = isLBLReviewMode(interaction);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
+      {isLineByLine && (
+        <button
+          type="button"
+          aria-label="Navigate Up"
+          disabled={lineByLineCurrentIndex <= 1}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onLineByLineNavigateUp?.();
+          }}
+          className="bp3-button bp3-minimal"
+          style={{
+            minWidth: '44px',
+            minHeight: '44px',
+            padding: '0 10px',
+            fontSize: '18px',
+            lineHeight: 1,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          ▲
+        </button>
+      )}
       <button
         type="button"
         aria-label="Previous"
@@ -413,16 +461,29 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
-      {isLblMode && (
-        <Blueprint.Button
-          className="text-base font-medium py-1"
-          intent="none"
-          onClick={onUndoLineByLineGrade}
-          outlined
-          disabled={!canUndoLineByLineGrade}
+      {isLineByLine && (
+        <button
+          type="button"
+          aria-label="Navigate Down"
+          disabled={lineByLineCurrentIndex >= lineByLineTotal || lineByLineTotal === 0}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onLineByLineNavigateDown?.();
+          }}
+          className="bp3-button bp3-minimal"
+          style={{
+            minWidth: '44px',
+            minHeight: '44px',
+            padding: '0 10px',
+            fontSize: '18px',
+            lineHeight: 1,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
         >
-          ↩ Undo
-        </Blueprint.Button>
+          ▼
+        </button>
       )}
       {isLblNextActive ? (
         <LblNextControls

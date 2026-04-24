@@ -100,8 +100,8 @@ interface MainContextProps {
   currentChildAlgorithm: SchedulingAlgorithm | undefined;
   currentChildIsLblNext: boolean;
   lineByLineIsCardComplete: boolean;
-  onUndoLineByLineGrade: () => void;
-  canUndoLineByLineGrade: boolean;
+  onLineByLineNavigateUp: (() => void) | undefined;
+  onLineByLineNavigateDown: (() => void) | undefined;
 }
 
 // 稳定引用：避免内联函数导致 React.memo 失效
@@ -295,10 +295,10 @@ const PracticeOverlay = ({
     dueChildCount,
     onLineByLineGrade,
     onLineByLineShowAnswer,
+    onLineByLineNavigateUp,
+    onLineByLineNavigateDown,
     currentChildAlgorithm,
     currentChildIsLblNext,
-    onUndoLineByLineGrade,
-    canUndoLineByLineGrade,
   } = useLineByLineReview({
     currentCardRefUid,
     childUidsList,
@@ -715,9 +715,9 @@ const PracticeOverlay = ({
     currentChildAlgorithm: isLineByLineActive ? currentChildAlgorithm : undefined,
     currentChildIsLblNext: isLineByLineActive ? currentChildIsLblNext : false,
     lineByLineIsCardComplete: isLineByLineActive ? lineByLineIsCardComplete : false,
-    onUndoLineByLineGrade,
-    canUndoLineByLineGrade: isLineByLineActive ? canUndoLineByLineGrade : false,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete, onUndoLineByLineGrade, canUndoLineByLineGrade]);
+    onLineByLineNavigateUp: isLineByLineActive ? onLineByLineNavigateUp : undefined,
+    onLineByLineNavigateDown: isLineByLineActive ? onLineByLineNavigateDown : undefined,
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete, onLineByLineNavigateUp, onLineByLineNavigateDown]);
 
   if (!todaySelectedTag) {
     return null;
