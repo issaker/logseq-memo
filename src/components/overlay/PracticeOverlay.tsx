@@ -82,6 +82,15 @@ import { handlePracticeProps } from '~/app';
 import { colors, getAlgorithmColor } from '~/theme';
 import { usePracticeSession, PracticeSessionContext } from '~/contexts/PracticeSessionContext';
 
+/**
+ * MainContext — shared state for Footer, Header, and child components.
+ *
+ * Dual-queue architecture:
+ * - Primary queue fields: currentIndex, cardQueueLength, onPracticeClick (←/→ navigation)
+ * - Secondary queue fields: isLineByLine, lineByLineCurrentIndex, lineByLineTotal,
+ *   lineByLineDueCount, onLineByLinePrev, onLineByLineNext (↑/↓ navigation)
+ * The two queues are independent — navigating one does not affect the other.
+ */
 interface MainContextProps {
   fixed_multiplier: number;
   setFixed_multiplier: (multiplier: number) => void;
@@ -407,6 +416,12 @@ const PracticeOverlay = ({
       if (isDone) return;
 
       if (isLineByLineActive && !lineByLineIsCardComplete) {
+        const currentChildUid = childUidsList[lineByLineCurrentChildIndex];
+        const childSession = currentChildUid ? childSessionData[currentChildUid] : undefined;
+        const isChildNew = !childSession || !childSession.nextDueDate;
+        if (!isChildNew && childSession.dateCreated && dateUtils.isSameDay(childSession.dateCreated, new Date()) && (childSession.sm2_grade === undefined || childSession.sm2_grade !== 0)) {
+          setShowOverwriteReminder(true);
+        }
         onLineByLineGrade(gradeData.sm2_grade);
         return;
       }
@@ -486,6 +501,9 @@ const PracticeOverlay = ({
       lineByLineIsCardComplete,
       onLineByLineGrade,
       currentIndex,
+      childUidsList,
+      lineByLineCurrentChildIndex,
+      childSessionData,
     ]
   );
 

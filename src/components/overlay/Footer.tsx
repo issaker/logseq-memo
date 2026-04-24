@@ -143,6 +143,7 @@ const Footer = ({
         label: 'Previous',
         onKeyDown: onPrevClick,
       },
+      // ↑/↓: secondary queue navigation (LBL child blocks), independent of ←/→ primary queue
       {
         combo: 'up',
         global: true,
@@ -318,6 +319,14 @@ const FinishedControls = ({ onStartCrammingClick, onCloseCallback }) => {
   );
 };
 
+/**
+ * LblCompletedControls — shown when all LBL child blocks are reviewed.
+ *
+ * ▲ button: navigates back to previous child block (secondary queue ↑),
+ *           which sets lineByLineIsCardComplete=false and restores grading ability.
+ * ▼ button: disabled (no more lines after the last).
+ * ◀/▶ buttons: primary queue navigation (←/→).
+ */
 const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLinePrev, onLineByLineNext: _onLineByLineNext }) => (
   <div className="flex items-center gap-3">
     <button
@@ -405,6 +414,13 @@ const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLinePrev, onLi
   </div>
 );
 
+/**
+ * GradingControlsWrapper — main grading UI with dual-queue navigation.
+ *
+ * ◀/▶: primary queue navigation (←/→ between cards)
+ * ▲/▼: secondary queue navigation (↑/↓ between LBL child blocks, LBL only)
+ * The two navigation systems are fully independent.
+ */
 const GradingControlsWrapper = ({
   activeButtonKey,
   skipFn,

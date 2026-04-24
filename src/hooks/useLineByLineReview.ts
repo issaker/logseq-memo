@@ -1,10 +1,29 @@
 /**
- * LBL (Line by Line) Review Hook.
+ * LBL (Line by Line) Review Hook — Secondary Queue Controller
+ *
+ * LBL is a "queue within a queue" (二级队列):
+ * - Primary queue (cardQueue + currentIndex): navigated by ←/→, managed by PracticeOverlay
+ * - Secondary queue (childUidsList + lineByLineCurrentChildIndex): navigated by ↑/↓, managed by this hook
+ *
+ * These two queues are fully independent — navigating one does not affect the other.
  *
  * Core architecture: child blocks have complete, independent Session Data.
  * - Each child block has its own ((childUid)) entry in the data page
  * - The parent LBL block only stores algorithm, interaction, and nextDueDate
  * - Child blocks can join any deck at any time as independent cards
+ * - Parent's algorithm serves as default for children without session data;
+ *   children with existing session data use their own algorithm
+ *
+ * Browsing position vs. due position (decoupled):
+ * - lineByLineCurrentChildIndex: user's browsing position, controllable via ↑/↓
+ * - findNextDueChildIndex(): next due position, used after grading to auto-advance
+ * - Algorithm switching only updates child session data — does NOT reset browsing position
+ * - Initialization only runs on card change or first data load, not on algorithm switch
+ *
+ * Completion state is reversible:
+ * - lineByLineIsCardComplete = true when index >= childUidsList.length (all reviewed)
+ * - Navigating back with ↑ sets index < length, making lineByLineIsCardComplete = false
+ * - This restores grading ability, allowing re-grading with overwrite
  *
  * Auto-skip logic:
  * - Due/unread child blocks: require user interaction (Show Answer + grade / Read+Next)
@@ -137,9 +156,28 @@ export default function useLineByLineReview({
 
   const dueChildCount = dueChildIndices.length;
 
+  const prevCardRefUidRef = React.useRef<string | undefined>(currentCardRefUid);
+  const hasInitializedForCardRef = React.useRef(false);
+
   React.useEffect(() => {
     if (!isLBLReviewMode || !childUidsList.length) {
       setLineByLineRevealedCount(0);
+      setLineByLineCurrentChildIndex(0);
+      hasInitializedForCardRef.current = false;
+      prevCardRefUidRef.current = currentCardRefUid;
+      return;
+    }
+
+    const cardChanged = prevCardRefUidRef.current !== currentCardRefUid;
+    prevCardRefUidRef.current = currentCardRefUid;
+
+    if (cardChanged) {
+      hasInitializedForCardRef.current = false;
+    }
+
+    if (hasInitializedForCardRef.current) return;
+
+    if (!Object.keys(childSessionData).length) {
       setLineByLineCurrentChildIndex(0);
       return;
     }
@@ -152,6 +190,8 @@ export default function useLineByLineReview({
     } else {
       setLineByLineRevealedCount(firstDueIndex);
     }
+
+    hasInitializedForCardRef.current = true;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLBLReviewMode, currentCardRefUid, childUidsList, childSessionData]);
 
