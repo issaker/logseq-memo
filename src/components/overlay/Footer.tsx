@@ -49,7 +49,7 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete } = React.useContext(MainContext);
+  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete, onUndoLineByLineGrade, canUndoLineByLineGrade } = React.useContext(MainContext);
   const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
@@ -228,6 +228,8 @@ const Footer = ({
           <LblCompletedControls
             onPrevClick={onPrevClick}
             onNextClick={skipFn}
+            onUndoClick={onUndoLineByLineGrade}
+            canUndo={canUndoLineByLineGrade}
           />
         ) : !showAnswers ? (
           <AnswerHiddenControls
@@ -294,7 +296,7 @@ const FinishedControls = ({ onStartCrammingClick, onCloseCallback }) => {
   );
 };
 
-const LblCompletedControls = ({ onPrevClick, onNextClick }) => (
+const LblCompletedControls = ({ onPrevClick, onNextClick, onUndoClick, canUndo }) => (
   <div className="flex items-center gap-3">
     <button
       type="button"
@@ -317,6 +319,15 @@ const LblCompletedControls = ({ onPrevClick, onNextClick }) => (
     >
       ◀
     </button>
+    <Blueprint.Button
+      className="text-base font-medium py-1"
+      intent="none"
+      onClick={onUndoClick}
+      outlined
+      disabled={!canUndo}
+    >
+      ↩ Undo
+    </Blueprint.Button>
     <span className="text-sm opacity-60">All lines reviewed</span>
     <button
       type="button"
@@ -355,8 +366,9 @@ const GradingControlsWrapper = ({
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
   const isAutoAdvanceMode = !isGradingAlgorithm(algorithm);
-  const { currentChildIsLblNext } = React.useContext(MainContext);
+  const { currentChildIsLblNext, onUndoLineByLineGrade, canUndoLineByLineGrade } = React.useContext(MainContext);
   const isLblNextActive = isLBLReviewMode(interaction) && currentChildIsLblNext;
+  const isLblMode = isLBLReviewMode(interaction);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -401,6 +413,17 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
+      {isLblMode && (
+        <Blueprint.Button
+          className="text-base font-medium py-1"
+          intent="none"
+          onClick={onUndoLineByLineGrade}
+          outlined
+          disabled={!canUndoLineByLineGrade}
+        >
+          ↩ Undo
+        </Blueprint.Button>
+      )}
       {isLblNextActive ? (
         <LblNextControls
           activeButtonKey={activeButtonKey}

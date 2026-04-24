@@ -100,6 +100,8 @@ interface MainContextProps {
   currentChildAlgorithm: SchedulingAlgorithm | undefined;
   currentChildIsLblNext: boolean;
   lineByLineIsCardComplete: boolean;
+  onUndoLineByLineGrade: () => void;
+  canUndoLineByLineGrade: boolean;
 }
 
 // 稳定引用：避免内联函数导致 React.memo 失效
@@ -295,6 +297,8 @@ const PracticeOverlay = ({
     onLineByLineShowAnswer,
     currentChildAlgorithm,
     currentChildIsLblNext,
+    onUndoLineByLineGrade,
+    canUndoLineByLineGrade,
   } = useLineByLineReview({
     currentCardRefUid,
     childUidsList,
@@ -711,7 +715,9 @@ const PracticeOverlay = ({
     currentChildAlgorithm: isLineByLineActive ? currentChildAlgorithm : undefined,
     currentChildIsLblNext: isLineByLineActive ? currentChildIsLblNext : false,
     lineByLineIsCardComplete: isLineByLineActive ? lineByLineIsCardComplete : false,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete]);
+    onUndoLineByLineGrade,
+    canUndoLineByLineGrade: isLineByLineActive ? canUndoLineByLineGrade : false,
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete, onUndoLineByLineGrade, canUndoLineByLineGrade]);
 
   if (!todaySelectedTag) {
     return null;

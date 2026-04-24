@@ -94,6 +94,15 @@ interface UseLineByLineReviewOutput {
   onLineByLineShowAnswer: () => void;
   currentChildAlgorithm: SchedulingAlgorithm;
   currentChildIsLblNext: boolean;
+  onUndoLineByLineGrade: () => void;
+  canUndoLineByLineGrade: boolean;
+}
+
+interface UndoSnapshot {
+  childUid: string;
+  previousChildSession: Session | undefined;
+  previousLineByLineCurrentChildIndex: number;
+  previousLineByLineRevealedCount: number;
 }
 
 export default function useLineByLineReview({
@@ -116,6 +125,7 @@ export default function useLineByLineReview({
 }: UseLineByLineReviewInput): UseLineByLineReviewOutput {
   const [lineByLineRevealedCount, setLineByLineRevealedCount] = React.useState(0);
   const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);
+  const [undoHistory, setUndoHistory] = React.useState<UndoSnapshot[]>([]);
 
   const currentChildAlgorithm = React.useMemo(() => {
     if (!isLBLReviewMode || !childUidsList.length || lineByLineCurrentChildIndex >= childUidsList.length) {
@@ -139,6 +149,7 @@ export default function useLineByLineReview({
     if (!isLBLReviewMode || !childUidsList.length) {
       setLineByLineRevealedCount(0);
       setLineByLineCurrentChildIndex(0);
+      setUndoHistory([]);
       return;
     }
 
@@ -163,6 +174,16 @@ export default function useLineByLineReview({
       const childUid = childUidsList[lineByLineCurrentChildIndex];
       const existingChildSession = childSessionData[childUid] || generateNewSession({ algorithm: currentChildAlgorithm });
       const now = new Date();
+
+      setUndoHistory((prev) => [
+        ...prev,
+        {
+          childUid,
+          previousChildSession: childSessionData[childUid],
+          previousLineByLineCurrentChildIndex: lineByLineCurrentChildIndex,
+          previousLineByLineRevealedCount: lineByLineRevealedCount,
+        },
+      ]);
 
       if (currentChildIsLblNext) {
         const childPracticeProps = {
@@ -335,6 +356,7 @@ export default function useLineByLineReview({
       setChildSessionData,
       setCardQueue,
       setShowAnswers,
+      lineByLineRevealedCount,
     ]
   );
 
@@ -342,6 +364,57 @@ export default function useLineByLineReview({
     setLineByLineRevealedCount((prev) => prev + 1);
     setShowAnswers(true);
   }, [setShowAnswers]);
+
+  const canUndoLineByLineGrade = undoHistory.length > 0;
+
+  const onUndoLineByLineGrade = React.useCallback(
+    async () => {
+      if (undoHistory.length === 0) return;
+
+      const snapshot = undoHistory[undoHistory.length - 1];
+      setUndoHistory((prev) => prev.slice(0, -1));
+
+      if (snapshot.previousChildSession) {
+        await savePracticeData({
+          refUid: snapshot.childUid,
+          dataPageTitle,
+          dateCreated: snapshot.previousChildSession.dateCreated || new Date(),
+          ...snapshot.previousChildSession,
+        });
+      }
+
+      await updateParentNextDueDate({
+        refUid: currentCardRefUid!,
+        childUids: childUidsList,
+        dataPageTitle,
+      });
+
+      setChildSessionData((prev) => {
+        const next = { ...prev };
+        if (snapshot.previousChildSession) {
+          next[snapshot.childUid] = snapshot.previousChildSession;
+        } else {
+          delete next[snapshot.childUid];
+        }
+        return next;
+      });
+
+      setSessionOverrides((prev) => {
+        const next = { ...prev };
+        if (snapshot.previousChildSession) {
+          next[snapshot.childUid] = snapshot.previousChildSession;
+        } else {
+          delete next[snapshot.childUid];
+        }
+        return next;
+      });
+
+      setLineByLineCurrentChildIndex(snapshot.previousLineByLineCurrentChildIndex);
+      setLineByLineRevealedCount(snapshot.previousLineByLineRevealedCount);
+      setShowAnswers(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [undoHistory, dataPageTitle, currentCardRefUid, childUidsList, setChildSessionData, setSessionOverrides, setShowAnswers]
+  );
 
   return {
     lineByLineRevealedCount,
@@ -352,5 +425,7 @@ export default function useLineByLineReview({
     onLineByLineShowAnswer,
     currentChildAlgorithm,
     currentChildIsLblNext,
+    onUndoLineByLineGrade,
+    canUndoLineByLineGrade,
   };
 }
