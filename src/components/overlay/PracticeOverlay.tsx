@@ -128,7 +128,6 @@ const PracticeOverlay = ({
     setIsCramming,
     handlePracticeClick,
     handleMemoTagChange,
-    fetchPracticeData,
     dataPageTitle,
     updateSetting,
   } = sessionContext;
@@ -365,9 +364,18 @@ const PracticeOverlay = ({
     }
   };
 
+  const prevInitialCardUidsRef = React.useRef<string[]>([]);
   React.useEffect(() => {
-    setCardQueue(initialCardUids);
-    setCurrentIndex(0);
+    const prevUids = prevInitialCardUidsRef.current;
+    const uidSetChanged =
+      prevUids.length !== initialCardUids.length ||
+      initialCardUids.some((uid, i) => uid !== prevUids[i]);
+
+    if (uidSetChanged) {
+      prevInitialCardUidsRef.current = initialCardUids;
+      setCardQueue(initialCardUids);
+      setCurrentIndex(0);
+    }
   }, [selectedTag, initialCardUids]);
 
   // When today data loads and initialCardUids becomes available, sync cardQueue
@@ -594,7 +602,6 @@ const PracticeOverlay = ({
           interaction: InteractionStyle.NORMAL,
         });
 
-        fetchPracticeData();
         return;
       }
 
@@ -621,8 +628,6 @@ const PracticeOverlay = ({
         algorithm: newAlgorithm,
         interaction: interaction,
       });
-
-      fetchPracticeData();
     },
     [
       currentCardRefUid,
@@ -630,7 +635,6 @@ const PracticeOverlay = ({
       cardMeta,
       currentCardData,
       applyOptimisticCardMeta,
-      fetchPracticeData,
       interaction,
       isLineByLineActive,
       lineByLineIsCardComplete,
@@ -668,8 +672,6 @@ const PracticeOverlay = ({
         algorithm: algorithm,
         interaction: newInteraction,
       });
-
-      fetchPracticeData();
     },
     [
       currentCardRefUid,
@@ -677,7 +679,6 @@ const PracticeOverlay = ({
       cardMeta,
       currentCardData,
       applyOptimisticCardMeta,
-      fetchPracticeData,
       algorithm,
     ]
   );
