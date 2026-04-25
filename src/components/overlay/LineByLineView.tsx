@@ -2,7 +2,7 @@ import * as React from 'react';
 import styled from '@emotion/styled';
 import CardBlock from '~/components/overlay/CardBlock';
 import { colors } from '~/theme';
-import { Session } from '~/models/session';
+import { Session, SchedulingAlgorithm, isGradingAlgorithm } from '~/models/session';
 import useBlockInfo from '~/hooks/useBlockInfo';
 
 // 稳定引用：避免内联函数导致 React.memo 失效
@@ -17,6 +17,10 @@ interface LineByLineViewProps {
   setHasCloze: (hasCloze: boolean) => void;
   showBreadcrumbs: boolean;
   autoCollapseBlocks: boolean;
+  showAnswers: boolean;
+  currentChildAlgorithm: SchedulingAlgorithm;
+  setChildHasBlockChildren: (hasBlockChildren: boolean) => void;
+  setChildHasCloze: (hasCloze: boolean) => void;
 }
 
 const getDueChildCount = (
@@ -43,8 +47,20 @@ const LineByLineView = ({
   setHasCloze,
   showBreadcrumbs,
   autoCollapseBlocks,
+  showAnswers,
+  currentChildAlgorithm,
+  setChildHasBlockChildren,
+  setChildHasCloze,
 }: LineByLineViewProps) => {
   const { blockInfo } = useBlockInfo({ refUid: currentCardRefUid });
+
+  const currentChildUid = childUidsList[lineByLineCurrentChildIndex] || '';
+  const { blockInfo: currentChildBlockInfo } = useBlockInfo({ refUid: currentChildUid });
+  const currentChildHasBlockChildren = !!currentChildBlockInfo.children && !!currentChildBlockInfo.children.length;
+
+  React.useEffect(() => {
+    setChildHasBlockChildren(currentChildHasBlockChildren);
+  }, [currentChildHasBlockChildren, setChildHasBlockChildren]);
 
   const dueCount = React.useMemo(
     () => getDueChildCount(childUidsList, childSessionData),
@@ -72,12 +88,13 @@ const LineByLineView = ({
         const childSession = childSessionData[uid];
         const isMastered =
           childSession && childSession.nextDueDate && childSession.nextDueDate > new Date();
+        const isCurrentGrading = isCurrentLine && isGradingAlgorithm(currentChildAlgorithm) && !isMastered;
         return (
           <LineByLineItem key={uid} $isCurrent={isCurrentLine} $isMastered={!!isMastered}>
             <CardBlock
               refUid={uid}
-              showAnswers={true}
-              setHasCloze={setHasCloze}
+              showAnswers={isCurrentGrading ? showAnswers : true}
+              setHasCloze={isCurrentLine ? setChildHasCloze : NOOP}
               breadcrumbs={[]}
               showBreadcrumbs={false}
               onRenderComplete={NOOP}

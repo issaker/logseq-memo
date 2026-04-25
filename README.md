@@ -160,15 +160,16 @@ Interaction mode (Normal/LBL) is a **parent-level property only**:
 - Switching interaction mode operates on the parent card directly
 - When a child block becomes an independent card, it defaults to `NORMAL` interaction mode
 
-##### SM2 Interaction in LBL Mode
+##### SM2 ShowAnswer in LBL Mode
 
-When using SM2 (a Q&A grading algorithm) within LBL mode, a special interaction flow applies:
+SM2's ShowAnswer behavior in LBL mode is **identical to Normal cards**:
 
-1. **Switching to SM2**: The system auto-navigates back one line and hides the SM2 line, showing a "Show Answer" button
-2. **Clicking "Show Answer"**: Reveals the SM2 line and displays grading buttons for re-evaluation
-3. **This logic only applies to LBL mode** — Normal cards' SM2 switch only affects hide/re-answer functionality
+1. **ShowAnswer trigger**: When a child block has sub-content (`hasBlockChildren`) or cloze (`hasCloze`), the ShowAnswer button is displayed
+2. **No ShowAnswer**: When a child block has no sub-content and no cloze, grading buttons are displayed directly
+3. **Switching to SM2**: The user stays at the current line — no back-navigation or hiding occurs
+4. **After grading**: Auto-advances to the next due child block (equivalent to Normal card's page turn)
 
-> **⚠️ Note for future algorithm developers**: When adding new Q&A grading algorithms, follow this same interaction pattern in LBL mode — switch should trigger back-navigation + hide, and Show Answer should reveal + advance.
+> **⚠️ Note for future algorithm developers**: When adding new Q&A grading algorithms, follow the same ShowAnswer pattern — ShowAnswer is determined by `hasBlockChildren`/`hasCloze`, not by algorithm-specific logic.
 
 ### Data Model
 

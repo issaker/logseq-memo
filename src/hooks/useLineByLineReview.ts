@@ -33,11 +33,12 @@
  * - InteractionSelector always displays the parent card's interaction, regardless of current child line
  * - Switching interaction mode operates on the parent card directly
  *
- * SM2 (grading algorithm) interaction in LBL mode:
- * - When switching to SM2: auto-navigate back one line and hide the SM2 line (onLineByLineSwitchToGradingAlgorithm)
- * - Show Answer in this context: advance to the hidden SM2 line, reveal it, show grading buttons
- * - This interaction logic ONLY applies to LBL mode; Normal cards' SM2 switch only affects hide/re-answer
- * - IMPORTANT: When adding new Q&A grading algorithms in the future, follow this same pattern in LBL mode
+ * SM2 (grading algorithm) ShowAnswer in LBL mode:
+ * - SM2 ShowAnswer is determined by hasBlockChildren/hasCloze, same as Normal cards
+ * - If a child block has sub-content or cloze: show ShowAnswer button, then grading buttons
+ * - If a child block has no sub-content and no cloze: show grading buttons directly
+ * - Switching to SM2 keeps the user at the current line (no back-navigation)
+ * - IMPORTANT: When adding new Q&A grading algorithms, follow this same ShowAnswer pattern
  *
  * Line rendering control:
  * - ▲ (up): revealedCount = newIndex + 1 (hide all lines below)
@@ -120,7 +121,6 @@ interface UseLineByLineReviewOutput {
   currentChildIsLblNext: boolean;
   onLineByLinePrev: () => void;
   onLineByLineNext: () => void;
-  onLineByLineSwitchToGradingAlgorithm: () => void;
 }
 
 export default function useLineByLineReview({
@@ -371,25 +371,9 @@ export default function useLineByLineReview({
   );
 
   const onLineByLineShowAnswer = React.useCallback(() => {
-    const nextIndex = lineByLineCurrentChildIndex + 1;
-    const isNextHidden = nextIndex < childUidsList.length && lineByLineRevealedCount <= nextIndex;
-
-    if (isNextHidden) {
-      const nextChildUid = childUidsList[nextIndex];
-      const nextChildSession = nextChildUid ? childSessionData[nextChildUid] : undefined;
-      const isNextGrading = nextChildSession && isGradingAlgorithm(nextChildSession.algorithm);
-
-      if (isNextGrading) {
-        setLineByLineCurrentChildIndex(nextIndex);
-        setLineByLineRevealedCount(nextIndex + 1);
-        setShowAnswers(true);
-        return;
-      }
-    }
-
     setLineByLineRevealedCount((prev) => Math.max(prev, lineByLineCurrentChildIndex + 1));
     setShowAnswers(true);
-  }, [lineByLineCurrentChildIndex, childUidsList, childSessionData, lineByLineRevealedCount, setShowAnswers]);
+  }, [lineByLineCurrentChildIndex, setShowAnswers]);
 
   const onLineByLinePrev = React.useCallback(() => {
     if (lineByLineCurrentChildIndex <= 0) return;
@@ -405,17 +389,6 @@ export default function useLineByLineReview({
     setLineByLineRevealedCount((prev) => Math.max(prev, newIndex + 1));
   }, [lineByLineCurrentChildIndex, childUidsList.length]);
 
-  const onLineByLineSwitchToGradingAlgorithm = React.useCallback(() => {
-    if (lineByLineCurrentChildIndex > 0) {
-      const newIndex = lineByLineCurrentChildIndex - 1;
-      setLineByLineCurrentChildIndex(newIndex);
-      setLineByLineRevealedCount(newIndex + 1);
-    } else {
-      setLineByLineRevealedCount(1);
-    }
-    setShowAnswers(false);
-  }, [lineByLineCurrentChildIndex, setShowAnswers]);
-
   return {
     lineByLineRevealedCount,
     lineByLineCurrentChildIndex,
@@ -427,6 +400,5 @@ export default function useLineByLineReview({
     currentChildIsLblNext,
     onLineByLinePrev,
     onLineByLineNext,
-    onLineByLineSwitchToGradingAlgorithm,
   };
 }
