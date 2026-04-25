@@ -121,15 +121,15 @@ All definitions are in `src/models/session.ts`.
 | `NORMAL` | Standard card review — show question, reveal answer |
 | `LBL` | Line-by-Line — per-child Q&A with independent scheduling |
 
-**LBL behavior is determined by the algorithm**:
+**LBL button bars are identical to Normal mode** — each child block is an independent card, just arranged line-by-line:
 
-| Algorithm | LBL Button Bar | Description |
-|-----------|---------------|-------------|
-| SM2 | ShowAnswer → Forgot / Hard / Good / Perfect | Grading-based, same as Normal cards. ShowAnswer appears only when child has sub-content or cloze. |
-| Progressive | Read + Next | Auto-advances on "Next" with Progressive interval calculation. Reinserts card into primary queue after each line. |
-| Fixed Time | Read + Next | Auto-advances on "Next" with FixedTime interval. Reinserts card into primary queue after each line. |
+| Algorithm | Normal Button Bar | LBL Button Bar |
+|-----------|-------------------|----------------|
+| SM2 | ShowAnswer → Forgot / Hard / Good / Perfect | ShowAnswer → Forgot / Hard / Good / Perfect |
+| Progressive | Review + Next | Review + Next |
+| Fixed Time | Change Interval + Next | Change Interval + Next |
 
-> **Three algorithms, three distinct button bars — no mixing.** Progressive and FixedTime both use "Read + Next" in LBL mode because the per-child interval is calculated automatically. In Normal mode, Progressive uses "Review + Next" and FixedTime uses "Change Interval + Next".
+> **LBL child blocks are Normal cards arranged line-by-line.** The only difference is navigation: Normal cards advance via page turn (setCurrentIndex + 1), LBL child blocks advance to the next due line (findNextDueChildIndex + 1).
 
 > The `READ` (Incremental Read) interaction has been removed — its functionality is now covered by `LBL + Progressive/Fixed Time`.
 

@@ -8,7 +8,7 @@ import * as dateUtils from '~/utils/date';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { isFixedTimeAlgorithm, isGradingAlgorithm, isLBLReviewMode, SchedulingAlgorithm, FixedTimeUnit, InteractionStyle, ALGORITHM_META, INTERACTION_META, Session } from '~/models/session';
+import { isFixedTimeAlgorithm, isGradingAlgorithm, SchedulingAlgorithm, FixedTimeUnit, InteractionStyle, ALGORITHM_META, INTERACTION_META, Session } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { usePracticeSession } from '~/contexts/PracticeSessionContext';
 import { getIntentColor, colors } from '~/theme';
@@ -419,13 +419,10 @@ const GradingControlsWrapper = ({
 }) => {
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
-  const { isLineByLine, onLineByLinePrev, onLineByLineNext, currentChildIsLblNext, currentChildAlgorithm } = React.useContext(MainContext);
+  const { isLineByLine, onLineByLinePrev, onLineByLineNext, currentChildAlgorithm } = React.useContext(MainContext);
   const effectiveAlgorithm = isLineByLine ? currentChildAlgorithm : algorithm;
   const isAutoAdvanceMode = !isGradingAlgorithm(effectiveAlgorithm);
-  // effectiveInteraction directly uses parent-level interaction — child blocks never store interaction.
-  // This prevents child block data pollution (e.g. interaction:NORMAL) from breaking isLblNextActive.
   const effectiveInteraction = interaction;
-  const isLblNextActive = isLBLReviewMode(effectiveInteraction) && currentChildIsLblNext;
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -517,13 +514,7 @@ const GradingControlsWrapper = ({
           </button>
         </>
       )}
-      {isLblNextActive ? (
-        <LblNextControls
-          activeButtonKey={activeButtonKey}
-          intervalPractice={intervalPractice}
-          intervalEstimates={intervalEstimates}
-        />
-      ) : isAutoAdvanceMode ? (
+      {isAutoAdvanceMode ? (
         <FixedIntervalModeControls
           activeButtonKey={activeButtonKey}
           intervalPractice={intervalPractice}
@@ -552,59 +543,7 @@ const GradingControlsWrapper = ({
   );
 };
 
-/**
- * LblNextControls
- *
- * Simplified grading UI for LBL + Non-grading algorithm (Progressive / FixedTime).
- * Displays a "Read" indicator with the next interval and a "Next" button
- * that advances to the next card. No grading buttons — the per-child
- * Progressive interval is calculated automatically in onLineByLineGrade.
- */
-const LblNextControls = ({
-  activeButtonKey,
-  intervalPractice,
-  intervalEstimates,
-}: {
-  activeButtonKey: string;
-  intervalPractice: () => void;
-  intervalEstimates: IntervalEstimates;
-}): JSX.Element => {
-  if (!intervalEstimates) {
-    console.error('Interval estimates not set');
-    return <></>;
-  }
 
-  return (
-    <>
-      <ControlButton
-        icon="book"
-        className="text-base font-normal py-1"
-        intent="default"
-        tooltipText={`Next section in ${formatDaysFromNow(intervalEstimates[0]?.nextDueDate)}`}
-        active={activeButtonKey === 'change-interval-button'}
-        outlined
-      >
-        <span className="ml-2">
-          Read <span className="font-medium mr-3">{formatDaysFromNow(intervalEstimates[0]?.nextDueDate) || 'Progressive'}</span>
-        </span>
-      </ControlButton>
-      <ControlButton
-        icon="tick"
-        className="text-base font-medium py-1"
-        intent="success"
-        onClick={() => intervalPractice()}
-        tooltipText={`Next card — resume reading in ${formatDaysFromNow(intervalEstimates[0]?.nextDueDate)}`}
-        active={activeButtonKey === 'next-button'}
-        outlined
-      >
-        Next{' '}
-        <span className="ml-2">
-          <ButtonTags>SPACE</ButtonTags>
-        </span>
-      </ControlButton>
-    </>
-  );
-};
 
 const FixedIntervalEditor = () => {
   const {

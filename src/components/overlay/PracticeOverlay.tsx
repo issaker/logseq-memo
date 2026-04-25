@@ -107,7 +107,6 @@ interface MainContextProps {
   cardMeta: import('~/models/session').CardMeta | undefined;
   baseCardData: Session | undefined;
   currentChildAlgorithm: SchedulingAlgorithm | undefined;
-  currentChildIsLblNext: boolean;
   lineByLineIsCardComplete: boolean;
   onLineByLinePrev: (() => void) | undefined;
   onLineByLineNext: (() => void) | undefined;
@@ -286,6 +285,10 @@ const PracticeOverlay = ({
   const childUidsList = React.useMemo(() => blockInfo.childrenUids || [], [blockInfo.childrenUids]);
 
   const [childSessionData, setChildSessionData] = React.useState<Record<string, Session>>({});
+  const childSessionDataRef = React.useRef<Record<string, Session>>({});
+  React.useEffect(() => {
+    childSessionDataRef.current = childSessionData;
+  }, [childSessionData]);
   const [childHasBlockChildren, setChildHasBlockChildren] = React.useState(false);
   const [childHasCloze, setChildHasCloze] = React.useState(false);
 
@@ -297,7 +300,7 @@ const PracticeOverlay = ({
     getChildSessionData({ childUids: childUidsList, dataPageTitle }).then((data) => {
       setChildSessionData(data as Record<string, Session>);
     });
-  }, [isLineByLineActive, childUidsList, dataPageTitle, currentCardRefUid]);
+  }, [isLineByLineActive, childUidsList, dataPageTitle, currentCardRefUid, currentIndex]);
 
   const {
     lineByLineRevealedCount,
@@ -424,7 +427,7 @@ const PracticeOverlay = ({
 
       if (isLineByLineActive && !lineByLineIsCardComplete) {
         const currentChildUid = childUidsList[lineByLineCurrentChildIndex];
-        const childSession = currentChildUid ? childSessionData[currentChildUid] : undefined;
+        const childSession = currentChildUid ? childSessionDataRef.current[currentChildUid] : undefined;
         const isChildReScoring = !!childSession
           && childSession.dateCreated
           && dateUtils.isSameDay(childSession.dateCreated, new Date())
@@ -513,7 +516,6 @@ const PracticeOverlay = ({
       currentIndex,
       childUidsList,
       lineByLineCurrentChildIndex,
-      childSessionData,
     ]
   );
 
@@ -745,11 +747,10 @@ const PracticeOverlay = ({
     cardMeta,
     baseCardData: effectiveBaseCardData,
     currentChildAlgorithm: isLineByLineActive ? currentChildAlgorithm : undefined,
-    currentChildIsLblNext: isLineByLineActive ? currentChildIsLblNext : false,
     lineByLineIsCardComplete: isLineByLineActive ? lineByLineIsCardComplete : false,
     onLineByLinePrev: isLineByLineActive ? onLineByLinePrev : undefined,
     onLineByLineNext: isLineByLineActive ? onLineByLineNext : undefined,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext]);
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext]);
 
   if (!todaySelectedTag) {
     return null;

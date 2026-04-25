@@ -179,18 +179,22 @@ export default function useLineByLineReview({
       return;
     }
     needsPositioningRef.current = true;
-  }, [isLBLReviewMode, currentCardRefUid, childUidsList]);
+  }, [isLBLReviewMode, currentCardRefUid, childUidsList, currentIndex]);
 
   React.useEffect(() => {
     if (!isLBLReviewMode || !childUidsList.length) return;
     if (!needsPositioningRef.current) return;
-    if (!Object.keys(childSessionData).length) return;
 
     needsPositioningRef.current = false;
 
+    if (!Object.keys(childSessionData).length) {
+      setLineByLineCurrentChildIndex(0);
+      setLineByLineRevealedCount(1);
+      return;
+    }
+
     const firstDueIndex = findNextDueChildIndex(childUidsList, childSessionData, 0);
     setLineByLineCurrentChildIndex(firstDueIndex);
-
     setLineByLineRevealedCount(firstDueIndex + 1);
   }, [isLBLReviewMode, childUidsList, childSessionData]);
 
