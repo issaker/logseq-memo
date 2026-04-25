@@ -32,7 +32,7 @@ interface UseLineByLineReviewInput {
   currentCardRefUid: string | undefined;
   childUidsList: string[];
   isLBLReviewMode: boolean;
-  isChildSessionLoading: boolean;
+  hasLoadedChildSessionsForCurrentCard: boolean;
   dataPageTitle: string;
   lblNextReinsertOffset: number;
   forgotReinsertOffset: number;
@@ -65,7 +65,7 @@ export default function useLineByLineReview({
   currentCardRefUid,
   childUidsList,
   isLBLReviewMode,
-  isChildSessionLoading,
+  hasLoadedChildSessionsForCurrentCard,
   dataPageTitle,
   lblNextReinsertOffset,
   forgotReinsertOffset,
@@ -116,14 +116,14 @@ export default function useLineByLineReview({
   React.useEffect(() => {
     if (!isLBLReviewMode || !childUidsList.length) return;
     if (!needsPositioningRef.current) return;
-    if (isChildSessionLoading) return;
+    if (!hasLoadedChildSessionsForCurrentCard) return;
 
     needsPositioningRef.current = false;
 
     const firstDueIndex = lblQueueState.nextDueChildIndex;
     setLineByLineCurrentChildIndex(firstDueIndex);
     setLineByLineRevealedCount(firstDueIndex + 1);
-  }, [isLBLReviewMode, childUidsList, childSessionData, isChildSessionLoading, lblQueueState]);
+  }, [isLBLReviewMode, childUidsList, childSessionData, hasLoadedChildSessionsForCurrentCard, lblQueueState]);
 
   const lineByLineIsCardComplete =
     isLBLReviewMode && lineByLineCurrentChildIndex >= childUidsList.length;
@@ -341,7 +341,7 @@ export default function useLineByLineReview({
       setChildSessionData,
       setCardQueue,
       setShowAnswers,
-      isChildSessionLoading,
+      hasLoadedChildSessionsForCurrentCard,
     ]
   );
 

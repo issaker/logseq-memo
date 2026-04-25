@@ -254,6 +254,78 @@ describe('PracticeOverlay', () => {
     expect(screen.getByText('Next')).toBeInTheDocument();
   });
 
+  it('returns to the next due line after leaving and revisiting an LBL card', async () => {
+    const mockBuilder = new testUtils.MockDataBuilder();
+    const lblCard = 'id_due_fixed_lbl';
+    const normalCard = 'id_due_normal';
+    const childOne = 'lbl-child-1';
+    const childTwo = 'lbl-child-2';
+
+    jest.spyOn(saveQueries, 'updateParentNextDueDate').mockResolvedValue(undefined);
+
+    mockBuilder.withCard({ uid: lblCard }).withSession(lblCard, {
+      algorithm: SchedulingAlgorithm.SM2,
+      interaction: InteractionStyle.LBL,
+      dateCreated: dateUtils.subtractDays(new Date(), 1),
+      nextDueDate: new Date(),
+    });
+    mockBuilder.withCard({ uid: normalCard }).withSession(normalCard, {
+      algorithm: SchedulingAlgorithm.SM2,
+      interaction: InteractionStyle.NORMAL,
+      dateCreated: dateUtils.subtractDays(new Date(), 1),
+      nextDueDate: new Date(),
+    });
+    mockBuilder
+      .withBlockInfo(lblCard, {
+        string: 'LBL parent',
+        children: [
+          { uid: childOne, order: 0, string: 'line 1' },
+          { uid: childTwo, order: 1, string: 'line 2' },
+        ],
+      })
+      .withBlockInfo(childOne, {
+        string: 'line 1',
+        children: [],
+      })
+      .withBlockInfo(childTwo, {
+        string: 'line 2',
+        children: [],
+      })
+      .withBlockInfo(normalCard, {
+        string: 'normal card',
+        children: [],
+      });
+
+    mockBuilder.mockQueryResults();
+    await act(async () => {
+      render(<App />);
+    });
+
+    await act(async () => {
+      testUtils.actions.launchModal();
+    });
+
+    expect(screen.getByText('Line 1 / 2 (2 due)')).toBeInTheDocument();
+
+    await testUtils.grade('Good', mockBuilder);
+
+    expect(screen.getByText('Line 2 / 2 (1 due)')).toBeInTheDocument();
+
+    await act(async () => {
+      const nextButton = screen.getByLabelText('Next');
+      nextButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+
+    await act(async () => {
+      const previousButton = screen.getByLabelText('Previous');
+      previousButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+
+    expect(screen.getByText('Line 2 / 2 (1 due)')).toBeInTheDocument();
+  });
+
   it('LBL reinsertion stops on the last line', () => {
     expect(
       shouldReinsertLblCard({

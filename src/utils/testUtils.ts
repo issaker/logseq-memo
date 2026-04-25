@@ -193,12 +193,14 @@ export class MockDataBuilder {
   cards: { [key: string]: string[] };
   sessions: { [key: string]: any[] };
   settingsOverride: Partial<Settings>;
+  blockInfoByUid: Record<string, any>;
 
   constructor() {
     this.tags = ['memo'];
     this.cards = {};
     this.sessions = {};
     this.settingsOverride = {};
+    this.blockInfoByUid = {};
   }
 
   mockQueryResults() {
@@ -219,6 +221,14 @@ export class MockDataBuilder {
         query: getPluginPageBlockDataQuery,
         result: this.buildSessionQueryResult(),
         args: [dataPageTitle, 'data'],
+      });
+    }
+
+    for (const [uid, blockInfo] of Object.entries(this.blockInfoByUid)) {
+      queryMocks.push({
+        query: blockInfoQuery,
+        args: [uid],
+        result: [[blockInfo]],
       });
     }
 
@@ -260,6 +270,11 @@ export class MockDataBuilder {
 
     this.cards[tag].push(uid);
 
+    return this;
+  }
+
+  withBlockInfo(uid: string, blockInfo: any) {
+    this.blockInfoByUid[uid] = blockInfo;
     return this;
   }
 

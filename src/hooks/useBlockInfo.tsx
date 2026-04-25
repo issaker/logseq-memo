@@ -12,17 +12,21 @@ const useBlockInfo = ({ refUid, refreshKey }: { refUid: any; refreshKey?: any })
 
   React.useEffect(() => {
     if (!refUid) return;
+    let cancelled = false;
 
     const fetch = async () => {
       try {
         const blockInfo = await fetchBlockInfo(refUid);
-        setBlockInfo({ ...blockInfo, refUid });
+        if (!cancelled) {
+          setBlockInfo({ ...blockInfo, refUid });
+        }
       } catch (err) {
         console.error('Memo: Failed to fetch block info', err);
       }
     };
 
     fetch();
+    return () => { cancelled = true; };
   }, [refUid, refreshKey]);
 
   return { blockInfo };
