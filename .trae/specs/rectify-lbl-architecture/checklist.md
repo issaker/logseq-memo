@@ -1,0 +1,10 @@
+- [ ] LBL 模式下 InteractionSelector 隐藏，只显示 AlgorithmSelector
+- [ ] Normal 模式下两个 Selector 都显示
+- [ ] 初始定位时 `lineByLineRevealedCount = firstDueIndex + 1`，当前行被渲染
+- [ ] SM2 子 block 初始进入时第一行可见（问题隐藏，需 Show Answer 揭示答案）
+- [ ] 上下翻行后 `lineByLineRevealedCount >= lineByLineCurrentChildIndex + 1`
+- [ ] 评分后 `lineByLineRevealedCount` 包含新的当前行
+- [ ] `onLineByLineShowAnswer` 确保当前行可见而非揭示下一行
+- [ ] 算法切换后 ShowAnswer 作用于当前行而非下一行
+- [ ] 切换到 LBL 模式时第一行子 block 正确显示
+- [ ] lint 和 typecheck 通过
