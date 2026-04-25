@@ -8,7 +8,7 @@ import { colors } from '~/theme';
 
 interface DeckConfigsTableProps {
   deckConfigs: string;
-  onChange: (deckConfigs: string) => void;
+  onChange: (_deckConfigs: string) => void;
   dailynoteEnabled: boolean;
 }
 
@@ -61,7 +61,7 @@ const WeightInput = styled.input`
   width: 75px;
 `;
 
-const DeckConfigsTable: React.FC<DeckConfigsTableProps> = ({ deckConfigs, onChange, dailynoteEnabled: _dailynoteEnabled }) => {
+const DeckConfigsTable: React.FC<DeckConfigsTableProps> = ({ deckConfigs, onChange }) => {
   const isDailyNote = (name: string) => name === DAILYNOTE_DECK_KEY;
 
   const [decks, setDecks] = React.useState<DeckConfig[]>(() => {

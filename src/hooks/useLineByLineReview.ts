@@ -122,7 +122,7 @@ interface UseLineByLineReviewOutput {
   lineByLineCurrentChildIndex: number;
   lineByLineIsCardComplete: boolean;
   dueChildCount: number;
-  onLineByLineGrade: (grade: number) => void;
+  onLineByLineGrade: (_grade: number) => void;
   onLineByLineShowAnswer: () => void;
   currentChildAlgorithm: SchedulingAlgorithm;
   currentChildIsLblNext: boolean;
@@ -181,6 +181,9 @@ export default function useLineByLineReview({
     needsPositioningRef.current = true;
   }, [isLBLReviewMode, currentCardRefUid, childUidsList, currentIndex]);
 
+  // currentCardRefUid is intentionally excluded: positioning must wait for childSessionData
+  // to be fetched for the new card; the needsPositioningRef mechanism (set by the effect
+  // above) ensures this effect only runs after a card change, not on every childSessionData update
   React.useEffect(() => {
     if (!isLBLReviewMode || !childUidsList.length) return;
     if (!needsPositioningRef.current) return;
@@ -205,6 +208,7 @@ export default function useLineByLineReview({
     async (grade: number) => {
       if (!currentCardRefUid || lineByLineCurrentChildIndex >= childUidsList.length) return;
 
+      try {
       const childUid = childUidsList[lineByLineCurrentChildIndex];
       const existingChildSession = childSessionData[childUid] || generateNewSession({ algorithm: currentChildAlgorithm });
       const now = new Date();
@@ -359,6 +363,9 @@ export default function useLineByLineReview({
       setLineByLineCurrentChildIndex(nextDueIndex);
       setLineByLineRevealedCount(nextDueIndex + 1);
       setShowAnswers(false);
+      } catch (err) {
+        console.error('Memo: Failed to grade LBL card', err);
+      }
     },
     [
       currentCardRefUid,

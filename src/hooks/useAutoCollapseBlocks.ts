@@ -23,9 +23,10 @@ export default function useAutoCollapseBlocks({
     const prevUid = prevCardRefUidRef.current;
     if (prevUid && prevUid !== currentCardRefUid && currentCardBlocksRef.current.length > 0) {
       const blocksToCollapse = [...currentCardBlocksRef.current];
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         blocksToCollapse.forEach((uid) => collapseBlockOnPage(uid));
       }, 300);
+      return () => clearTimeout(timer);
     }
 
     prevCardRefUidRef.current = currentCardRefUid;

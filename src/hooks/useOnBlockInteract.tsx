@@ -14,8 +14,8 @@ const useOnBlockInteract = ({
   onEnterCallback,
   onLeaveCallback,
 }: {
-  onEnterCallback: (elm: HTMLTextAreaElement) => void;
-  onLeaveCallback: (elm: HTMLTextAreaElement) => void;
+  onEnterCallback: (_elm: HTMLTextAreaElement) => void;
+  onLeaveCallback: (_elm: HTMLTextAreaElement) => void;
 }) => {
   React.useEffect(() => {
     document.leave('textarea.rm-block-input', onLeaveCallback);

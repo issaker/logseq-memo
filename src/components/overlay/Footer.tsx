@@ -252,7 +252,6 @@ const Footer = ({
             onPrevClick={onPrevClick}
             onNextClick={skipFn}
             onLineByLinePrev={onLineByLinePrev}
-            onLineByLineNext={onLineByLineNext}
           />
         ) : !showAnswers ? (
           <AnswerHiddenControls
@@ -319,7 +318,7 @@ const FinishedControls = ({ onStartCrammingClick, onCloseCallback }) => {
   );
 };
 
-const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLinePrev, onLineByLineNext: _onLineByLineNext }) => (
+const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLinePrev }) => (
   <div className="flex items-center gap-3">
     <button
       type="button"
@@ -722,7 +721,7 @@ const SpacedIntervalModeControls = ({
   intervalEstimates,
 }: {
   activeButtonKey: string;
-  gradeFn: (sm2_grade: number) => void;
+  gradeFn: (_sm2_grade: number) => void;
   intervalEstimates: IntervalEstimates;
 }): JSX.Element => {
   if (!intervalEstimates) {
@@ -904,7 +903,7 @@ const AlgorithmSelector = ({
   onSelectAlgorithm,
 }: {
   algorithm: SchedulingAlgorithm | undefined;
-  onSelectAlgorithm: (algorithm: SchedulingAlgorithm) => void;
+  onSelectAlgorithm: (_algorithm: SchedulingAlgorithm) => void;
 }) => {
   const activeOption = ALGORITHM_OPTIONS.find((o) => o.value === algorithm) || ALGORITHM_OPTIONS[0];
 
@@ -931,7 +930,7 @@ const AlgorithmSelector = ({
         onSelectAlgorithm(option.value);
       }}
       popoverProps={{ minimal: true }}
-      itemPredicate={(_, _option: AlgorithmOption) => true}
+      itemPredicate={() => true}
     >
       <Blueprint.Button
         rightIcon="caret-down"
@@ -950,7 +949,7 @@ const InteractionSelector = ({
   onSelectInteraction,
 }: {
   interaction: InteractionStyle | undefined;
-  onSelectInteraction: (interaction: InteractionStyle) => void;
+  onSelectInteraction: (_interaction: InteractionStyle) => void;
 }) => {
   const activeOption = INTERACTION_OPTIONS.find((o) => o.value === interaction) || INTERACTION_OPTIONS[0];
 
@@ -978,7 +977,7 @@ const InteractionSelector = ({
         onSelectInteraction(option.value);
       }}
       popoverProps={{ minimal: true }}
-      itemPredicate={(_, _option: InteractionOption) => true}
+      itemPredicate={() => true}
     >
       <Blueprint.Button
         icon={activeOption.icon}

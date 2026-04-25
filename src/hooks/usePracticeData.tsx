@@ -42,18 +42,22 @@ const usePracticeCardsData = ({
     (async () => {
       if (!selectedTag) return;
 
-      const { practiceData, todayStats } = await queries.getPracticeData({
-        tagsList,
-        dataPageTitle,
-        dailyLimit,
-        isCramming,
-        shuffleCards,
-        cachedData: cachedDataRef.current,
-        deckConfigs,
-      });
+      try {
+        const { practiceData, todayStats } = await queries.getPracticeData({
+          tagsList,
+          dataPageTitle,
+          dailyLimit,
+          isCramming,
+          shuffleCards,
+          cachedData: cachedDataRef.current,
+          deckConfigs,
+        });
 
-      setToday(todayStats);
-      setPracticeData(practiceData);
+        setToday(todayStats);
+        setPracticeData(practiceData);
+      } catch (err) {
+        console.error('Memo: Failed to fetch practice data', err);
+      }
     })();
   }, [
     selectedTag,

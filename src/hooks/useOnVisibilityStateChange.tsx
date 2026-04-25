@@ -7,7 +7,7 @@
 import * as React from 'react';
 
 const useOnVisibilityStateChange = (callback: () => void) => {
-  // useRef: 存储 callback 引用，避免 callback 变化导致事件监听器频繁重新注册
+  // useRef: store callback reference, prevent frequent event listener re-registration when callback changes
   const callbackRef = React.useRef(callback);
   callbackRef.current = callback;
 

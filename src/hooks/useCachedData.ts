@@ -23,8 +23,12 @@ const useCachedData = ({
 
   React.useEffect(() => {
     const getData = async () => {
-      const result = await queries.getPluginPageCachedData({ dataPageTitle });
-      setData(result);
+      try {
+        const result = await queries.getPluginPageCachedData({ dataPageTitle });
+        setData(result);
+      } catch (err) {
+        console.error('Memo: Failed to fetch cached data', err);
+      }
     };
 
     getData();

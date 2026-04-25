@@ -160,6 +160,7 @@ export const generateMockRoamAlphaAPI = ({
 
     return Promise.resolve(mock.result);
   }),
+  updateBlock: jest.fn(() => Promise.resolve()),
   ui: {
     commandPalette: {
       addCommand: jest.fn(),

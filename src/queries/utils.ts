@@ -220,7 +220,7 @@ export const getDailyNoteBlockUids = async (): Promise<string[]> => {
     return [];
   }
 
-  // 单次批量查询：替代逐页 N+1 查询模式
+  // Single batch query: replaces per-page N+1 query pattern
   const allBlocksQuery = `
     [:find ?blockUid
      :in $ [?pageUid ...]

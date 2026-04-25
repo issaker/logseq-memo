@@ -208,7 +208,7 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
         }
       }
 
-      // Promise.all: 并行删除子块，减少串行等待时间
+      // Promise.all: delete child blocks in parallel, reduces serial wait time
       await Promise.all(
         todayBlock.children
           .filter((child) => child?.uid)
@@ -226,7 +226,7 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
 
   const nextDueDate = data.nextDueDate !== undefined ? data.nextDueDate : dateUtils.addDays(referenceDate, data.sm2_interval);
 
-  // Promise.all: 并行创建子块，减少串行等待时间
+  // Promise.all: create child blocks in parallel, reduces serial wait time
   const fieldEntries = Object.keys(data)
     .filter((key) => data[key] !== undefined && key !== 'algorithm' && key !== 'interaction')
     .map((key) => {

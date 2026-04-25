@@ -5,7 +5,7 @@ import { colors } from '~/theme';
 import { Session, SchedulingAlgorithm, isGradingAlgorithm } from '~/models/session';
 import useBlockInfo from '~/hooks/useBlockInfo';
 
-// 稳定引用：避免内联函数导致 React.memo 失效
+// Stable reference: prevent inline functions from invalidating React.memo
 const NOOP = () => {};
 
 interface LineByLineViewProps {
@@ -14,13 +14,13 @@ interface LineByLineViewProps {
   lineByLineRevealedCount: number;
   lineByLineCurrentChildIndex: number;
   childSessionData: Record<string, Session>;
-  setHasCloze: (hasCloze: boolean) => void;
+  setHasCloze: (_hasCloze: boolean) => void;
   showBreadcrumbs: boolean;
   autoCollapseBlocks: boolean;
   showAnswers: boolean;
   currentChildAlgorithm: SchedulingAlgorithm;
-  setChildHasBlockChildren: (hasBlockChildren: boolean) => void;
-  setChildHasCloze: (hasCloze: boolean) => void;
+  setChildHasBlockChildren: (_hasBlockChildren: boolean) => void;
+  setChildHasCloze: (_hasCloze: boolean) => void;
 }
 
 const getDueChildCount = (

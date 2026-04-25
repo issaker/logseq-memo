@@ -10,7 +10,7 @@ const cleanupSleep = (ms: number) => new Promise((resolve) => setTimeout(resolve
 interface HistoryCleanupProps {
   dataPageTitle: string;
   keepCount: number;
-  onKeepCountChange: (nextKeepCount: number) => void;
+  onKeepCountChange: (_nextKeepCount: number) => void;
 }
 
 const HistoryCleanupSection = ({

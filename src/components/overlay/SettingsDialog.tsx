@@ -11,7 +11,7 @@ interface SettingsDialogProps {
   settings: SettingsFormSettings & {
     historyCleanupKeepCount: number;
   };
-  onApplyAndClose: (settings: SettingsFormSettings) => void;
+  onApplyAndClose: (_settings: SettingsFormSettings) => void;
   dataPageTitle: string;
 }
 

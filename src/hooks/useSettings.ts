@@ -154,21 +154,23 @@ const useSettings = () => {
     hasInitializedRef.current = true;
 
     const initialize = async () => {
-      const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
-      const hasExistingSettings = SETTING_KEYS.some((key) => key in allSettings);
+      try {
+        const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
+        const hasExistingSettings = SETTING_KEYS.some((key) => key in allSettings);
 
-      if (!hasExistingSettings) {
-        // Cold start (roam/js): no in-memory settings → load from page
-        const loaded = await syncPageToExtensionAPI(defaultSettings.dataPageTitle);
-        if (!loaded) {
+        if (!hasExistingSettings) {
+          const loaded = await syncPageToExtensionAPI(defaultSettings.dataPageTitle);
+          if (!loaded) {
+            ensureAllDefaults();
+          }
+        } else {
           ensureAllDefaults();
         }
-      } else {
-        // Warm start: extensionAPI has data → just fill missing defaults
-        ensureAllDefaults();
-      }
 
-      syncSettingsFromAPI();
+        syncSettingsFromAPI();
+      } catch (err) {
+        console.error('Memo: Failed to initialize settings', err);
+      }
     };
 
     initialize();

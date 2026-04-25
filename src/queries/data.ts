@@ -72,7 +72,7 @@ export const getPracticeData = async ({
   const sessionData = {};
   const cardUids: Record<string, RecordUid[]> = {};
 
-  // Promise.all: 并行查询多个 tag 的数据，减少串行等待时间
+  // Promise.all: parallel queries for multiple tags, reduces serial wait time
   const results = await Promise.all(
     tagsList.map((tag) => getSessionData({ pluginPageData, tag, dataPageTitle }))
   );
@@ -439,7 +439,7 @@ export const getChildSessionData = async ({
 }): Promise<Records> => {
   if (!childUids.length) return {};
 
-  // 优先使用已缓存的数据，避免全量数据页重载
+  // Prefer cached data to avoid full data page reload
   const pluginPageData = existingPluginPageData || (await getPluginPageData({
     dataPageTitle,
     limitToLatest: true,

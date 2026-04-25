@@ -130,6 +130,8 @@ describe('supermemo: simulate practice', () => {
       });
 
       expect(result.algorithm).toBe(SchedulingAlgorithm.SM2);
+      expect('lblNextReinsertOffset' in result).toBe(false);
+      expect('lbl_progress' in result).toBe(false);
     });
   });
 

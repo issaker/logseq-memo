@@ -57,9 +57,8 @@ describe('daysBetween', () => {
   });
 
   test('Same day', () => {
-    const hourInMs = 1000 * 60 * 60;
-    const today = new Date();
-    const earlierToday = new Date(today.getTime() - hourInMs * 13);
+    const today = new Date(2026, 3, 21, 15, 0, 0);
+    const earlierToday = new Date(2026, 3, 21, 2, 0, 0);
 
     expect(dateUtils.daysBetween(today, earlierToday)).toEqual(0);
   });

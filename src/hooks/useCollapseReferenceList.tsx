@@ -42,7 +42,7 @@ const useCollapseReferenceList = ({ dataPageTitle }) => {
   }, [dataPageTitle, collapseDataReferenceBlock]);
 
   React.useEffect(() => {
-    // 防抖：防止 MutationObserver 回调触发的 DOM 变化再次触发观察者
+    // Debounce: prevent MutationObserver callback DOM changes from re-triggering the observer
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const debouncedCollapse = () => {
       if (debounceTimer) clearTimeout(debounceTimer);

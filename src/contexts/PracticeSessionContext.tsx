@@ -12,16 +12,16 @@ export interface PracticeSessionContextValue {
   selectedTag: string;
   tagsList: string[];
   isCramming: boolean;
-  setIsCramming: (isCramming: boolean) => void;
-  handlePracticeClick: (props: handlePracticeProps) => void;
-  handleMemoTagChange: (tag: string) => void;
+  setIsCramming: (_isCramming: boolean) => void;
+  handlePracticeClick: (_props: handlePracticeProps) => void;
+  handleMemoTagChange: (_tag: string) => void;
   fetchPracticeData: () => void;
   dataPageTitle: string;
-  updateSetting: (key: keyof Settings, value: any) => void;
+  updateSetting: (_key: keyof Settings, _value: any) => void;
   algorithm?: SchedulingAlgorithm;
   interaction?: InteractionStyle;
-  onSelectAlgorithm?: (algorithm: SchedulingAlgorithm) => void;
-  onSelectInteraction?: (interaction: InteractionStyle) => void;
+  onSelectAlgorithm?: (_algorithm: SchedulingAlgorithm) => void;
+  onSelectInteraction?: (_interaction: InteractionStyle) => void;
 }
 
 export const PracticeSessionContext = React.createContext<PracticeSessionContextValue | undefined>(
@@ -35,12 +35,12 @@ interface PracticeSessionProviderProps {
   selectedTag: string;
   tagsList: string[];
   isCramming: boolean;
-  setIsCramming: (isCramming: boolean) => void;
-  handlePracticeClick: (props: handlePracticeProps) => void;
-  handleMemoTagChange: (tag: string) => void;
+  setIsCramming: (_isCramming: boolean) => void;
+  handlePracticeClick: (_props: handlePracticeProps) => void;
+  handleMemoTagChange: (_tag: string) => void;
   fetchPracticeData: () => void;
   dataPageTitle: string;
-  updateSetting: (key: keyof Settings, value: any) => void;
+  updateSetting: (_key: keyof Settings, _value: any) => void;
   children: React.ReactNode;
 }
 

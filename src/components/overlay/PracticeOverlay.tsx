@@ -93,10 +93,10 @@ import { usePracticeSession, PracticeSessionContext } from '~/contexts/PracticeS
  */
 interface MainContextProps {
   fixed_multiplier: number;
-  setFixed_multiplier: (multiplier: number) => void;
+  setFixed_multiplier: (_multiplier: number) => void;
   fixed_unit: FixedTimeUnit;
-  setFixed_unit: (unit: FixedTimeUnit) => void;
-  onPracticeClick: (props: handlePracticeProps) => void;
+  setFixed_unit: (_unit: FixedTimeUnit) => void;
+  onPracticeClick: (_props: handlePracticeProps) => void;
   currentIndex: number;
   renderMode: RenderMode;
   isLineByLine: boolean;
@@ -112,7 +112,7 @@ interface MainContextProps {
   onLineByLineNext: (() => void) | undefined;
 }
 
-// 稳定引用：避免内联函数导致 React.memo 失效
+// Stable reference: prevent inline functions from invalidating React.memo
 const NOOP = () => {};
 
 export const MainContext = React.createContext<MainContextProps>({} as MainContextProps);
@@ -297,9 +297,13 @@ const PracticeOverlay = ({
       setChildSessionData({});
       return;
     }
+    let cancelled = false;
     getChildSessionData({ childUids: childUidsList, dataPageTitle }).then((data) => {
-      setChildSessionData(data as Record<string, Session>);
+      if (!cancelled) {
+        setChildSessionData(data as Record<string, Session>);
+      }
     });
+    return () => { cancelled = true; };
   }, [isLineByLineActive, childUidsList, dataPageTitle, currentCardRefUid, currentIndex]);
 
   const {
@@ -390,7 +394,7 @@ const PracticeOverlay = ({
     await asyncUtils.sleep(200);
 
     if (document.activeElement instanceof HTMLElement) {
-      document?.activeElement.blur();
+      document.activeElement?.blur();
     }
   };
 
@@ -578,7 +582,7 @@ const PracticeOverlay = ({
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         // Small delay to check if another input gets focus
-        // 卸载保护：防止组件卸载后执行状态更新
+        // Unmount guard: prevent state updates after component unmount
         setTimeout(() => {
           if (!isMountedRef.current) return;
           const activeElement = document.activeElement;
@@ -610,6 +614,7 @@ const PracticeOverlay = ({
         const currentChildUid = childUidsList[lineByLineCurrentChildIndex];
         if (!currentChildUid) return;
 
+        try {
         const existingChildSession = childSessionData[currentChildUid] || generateNewSession({ algorithm: newAlgorithm });
 
         setChildSessionData((prev) => ({
@@ -639,12 +644,16 @@ const PracticeOverlay = ({
           dataPageTitle,
           algorithm: newAlgorithm,
         });
+        } catch (err) {
+          console.error('Memo: Failed to update algorithm', err);
+        }
 
         return;
       }
 
       if (!interaction) throw new Error('interaction is undefined in onSelectAlgorithm');
 
+      try {
       setSessionOverrides((prev) => ({
         ...prev,
         [currentCardRefUid]: {
@@ -666,6 +675,9 @@ const PracticeOverlay = ({
         algorithm: newAlgorithm,
         interaction: interaction,
       });
+      } catch (err) {
+        console.error('Memo: Failed to update algorithm', err);
+      }
     },
     [
       currentCardRefUid,
@@ -689,6 +701,7 @@ const PracticeOverlay = ({
       if (!currentCardRefUid) return;
       if (!algorithm) throw new Error('algorithm is undefined in onSelectInteraction');
 
+      try {
       setSessionOverrides((prev) => ({
         ...prev,
         [currentCardRefUid]: {
@@ -710,6 +723,9 @@ const PracticeOverlay = ({
         algorithm: algorithm,
         interaction: newInteraction,
       });
+      } catch (err) {
+        console.error('Memo: Failed to update interaction', err);
+      }
     },
     [
       currentCardRefUid,
@@ -721,7 +737,7 @@ const PracticeOverlay = ({
     ]
   );
 
-  // useMemo: 稳定引用避免消费 PracticeSessionContext 的子组件不必要重渲染
+  // useMemo: stable reference to prevent unnecessary re-renders in PracticeSessionContext consumers
   const sessionContextValue = React.useMemo(() => ({
     ...sessionContext,
     algorithm,
@@ -730,7 +746,7 @@ const PracticeOverlay = ({
     onSelectInteraction,
   }), [sessionContext, algorithm, interaction, onSelectAlgorithm, onSelectInteraction]);
 
-  // useMemo: 稳定引用避免消费 MainContext 的子组件不必要重渲染
+  // useMemo: stable reference to prevent unnecessary re-renders in MainContext consumers
   const mainContextValue = React.useMemo(() => ({
     fixed_multiplier,
     setFixed_multiplier,
@@ -917,7 +933,7 @@ const Dialog = styled(Blueprint.Dialog)<{
   }
 `;
 
-// 静态 CSS 常量：不依赖组件状态，避免每次渲染重新生成
+// Static CSS constant: independent of component state, avoids regeneration on every render
 const MOBILE_OVERLAY_STYLES = `
   @media (max-width: 768px) {
     /* Mobile: Make backdrop transparent and clickable-through */

@@ -85,7 +85,7 @@ export const calculateTodayStatus = ({ today, tagsList }) => {
 export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) => {
   for (const tag of tagsList) {
     let count = 0;
-    // 循环外创建 Date：避免每次迭代重复创建对象
+    // Create Date outside loop: avoid repeated object creation per iteration
     const now = new Date();
     const completedUids: RecordUid[] = [];
 

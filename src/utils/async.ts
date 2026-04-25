@@ -16,7 +16,7 @@ export const debounce = (func, timeout = 300) => {
       func(...args);
     }, timeout);
   };
-  // cancel: 允许在组件卸载时取消待执行的延迟调用
+  // cancel: allow cancelling pending delayed calls on component unmount
   debounced.cancel = () => {
     clearTimeout(timer);
   };

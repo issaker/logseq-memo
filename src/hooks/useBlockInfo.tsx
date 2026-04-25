@@ -14,8 +14,12 @@ const useBlockInfo = ({ refUid, refreshKey }: { refUid: any; refreshKey?: any })
     if (!refUid) return;
 
     const fetch = async () => {
-      const blockInfo = await fetchBlockInfo(refUid);
-      setBlockInfo({ ...blockInfo, refUid });
+      try {
+        const blockInfo = await fetchBlockInfo(refUid);
+        setBlockInfo({ ...blockInfo, refUid });
+      } catch (err) {
+        console.error('Memo: Failed to fetch block info', err);
+      }
     };
 
     fetch();

@@ -266,7 +266,9 @@ After upgrading to the `SchedulingAlgorithm × InteractionStyle` architecture, r
 
 ```bash
 npm install
+npm run dev          # Development mode (watch & rebuild on change)
 npm run build        # Production build → build/extension.js
+npm run lint         # Run ESLint on all source files
 npm run typecheck    # TypeScript type checking
 npm run test         # Run tests
 ```

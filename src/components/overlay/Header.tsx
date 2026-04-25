@@ -12,7 +12,7 @@ import { usePracticeSession } from '~/contexts/PracticeSessionContext';
 
 interface HeaderProps {
   onCloseCallback: () => void;
-  onTagChange: (tag: string) => void;
+  onTagChange: (_tag: string) => void;
   className?: string;
   status: string | null;
   isDone: boolean;

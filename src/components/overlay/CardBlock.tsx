@@ -19,7 +19,7 @@ const CardBlock = ({
 }: {
   refUid: string;
   showAnswers: boolean;
-  setHasCloze: (hasCloze: boolean) => void;
+  setHasCloze: (_hasCloze: boolean) => void;
   breadcrumbs: BreadcrumbsType[];
   showBreadcrumbs: boolean;
   onRenderComplete?: () => void;
@@ -69,6 +69,7 @@ const CardBlock = ({
       const currentRefUid = refUidRef.current;
       if (!ref.current) return;
 
+      try {
       await window.roamAlphaAPI.ui.components.unmountNode({ el: ref.current });
       await window.roamAlphaAPI.ui.components.renderBlock({ uid: currentRefUid, el: ref.current });
 
@@ -116,6 +117,9 @@ const CardBlock = ({
 
       // Notify parent that rendering is complete
       onRenderComplete?.();
+      } catch (err) {
+        console.error('Memo: Failed to render block', err);
+      }
     };
 
     // Create the debounced function only once

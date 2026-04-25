@@ -16,7 +16,7 @@ interface SettingsFormProps {
 }
 
 const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
-  ({ settings, dataPageTitle: _dataPageTitle }, ref) => {
+  ({ settings }, ref) => {
     const [formSettings, setFormSettings] = React.useState<SettingsFormSettings>({
       deckConfigs: settings.deckConfigs,
       dataPageTitle: settings.dataPageTitle,
