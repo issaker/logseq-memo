@@ -83,13 +83,12 @@ import { colors, getAlgorithmColor } from '~/theme';
 import { usePracticeSession, PracticeSessionContext } from '~/contexts/PracticeSessionContext';
 
 /**
- * MainContext — shared state for Footer, Header, and child components.
+ * MainContext: shared state for the review overlay.
  *
  * Dual-queue architecture:
- * - Primary queue fields: currentIndex, cardQueueLength, onPracticeClick (←/→ navigation)
- * - Secondary queue fields: isLineByLine, lineByLineCurrentIndex, lineByLineTotal,
- *   lineByLineDueCount, onLineByLinePrev, onLineByLineNext (↑/↓ navigation)
- * The two queues are independent — navigating one does not affect the other.
+ * - Primary queue: ◀/▶ navigate between cards (cardQueue + currentIndex)
+ * - Secondary queue (LBL): ▲/▼ navigate between child blocks (childUidsList + lineByLineCurrentChildIndex)
+ * - onLineByLinePrev/onLineByLineNext are only available when isLineByLine is true
  */
 interface MainContextProps {
   fixed_multiplier: number;
@@ -111,7 +110,6 @@ interface MainContextProps {
   lineByLineIsCardComplete: boolean;
   onLineByLinePrev: (() => void) | undefined;
   onLineByLineNext: (() => void) | undefined;
-  onLineByLineShowAnswer: (() => void) | undefined;
 }
 
 // 稳定引用：避免内联函数导致 React.memo 失效
@@ -288,28 +286,13 @@ const PracticeOverlay = ({
 
   const [childSessionData, setChildSessionData] = React.useState<Record<string, Session>>({});
 
-  const prevCardRefUidForChildDataRef = React.useRef<string | undefined>(currentCardRefUid);
-
   React.useEffect(() => {
     if (!isLineByLineActive || !childUidsList.length || !dataPageTitle) {
+      setChildSessionData({});
       return;
     }
-
-    const cardChanged = prevCardRefUidForChildDataRef.current !== currentCardRefUid;
-    prevCardRefUidForChildDataRef.current = currentCardRefUid;
-
-    if (!cardChanged) return;
-
     getChildSessionData({ childUids: childUidsList, dataPageTitle }).then((data) => {
-      setChildSessionData((prev) => {
-        const merged = { ...data };
-        for (const uid of Object.keys(prev)) {
-          if (childUidsList.includes(uid) && !merged[uid]) {
-            merged[uid] = prev[uid];
-          }
-        }
-        return merged;
-      });
+      setChildSessionData(data as Record<string, Session>);
     });
   }, [isLineByLineActive, childUidsList, dataPageTitle, currentCardRefUid]);
 
@@ -374,8 +357,6 @@ const PracticeOverlay = ({
         const isChildMastered = childSession && childSession.nextDueDate && childSession.nextDueDate > new Date();
         if (isChildMastered || currentChildIsLblNext) {
           setShowAnswers(true);
-        } else if (!childSession && !Object.keys(childSessionData).length) {
-          setShowAnswers(true);
         } else {
           setShowAnswers(false);
         }
@@ -436,8 +417,11 @@ const PracticeOverlay = ({
       if (isLineByLineActive && !lineByLineIsCardComplete) {
         const currentChildUid = childUidsList[lineByLineCurrentChildIndex];
         const childSession = currentChildUid ? childSessionData[currentChildUid] : undefined;
-        const isChildNew = !childSession || !childSession.nextDueDate;
-        if (!isChildNew && childSession.dateCreated && dateUtils.isSameDay(childSession.dateCreated, new Date()) && (childSession.sm2_grade === undefined || childSession.sm2_grade !== 0)) {
+        const isChildReScoring = !!childSession
+          && childSession.dateCreated
+          && dateUtils.isSameDay(childSession.dateCreated, new Date())
+          && childSession.sm2_grade !== 0;
+        if (isChildReScoring) {
           setShowOverwriteReminder(true);
         }
         onLineByLineGrade(gradeData.sm2_grade);
@@ -760,8 +744,7 @@ const PracticeOverlay = ({
     lineByLineIsCardComplete: isLineByLineActive ? lineByLineIsCardComplete : false,
     onLineByLinePrev: isLineByLineActive ? onLineByLinePrev : undefined,
     onLineByLineNext: isLineByLineActive ? onLineByLineNext : undefined,
-    onLineByLineShowAnswer: isLineByLineActive ? onLineByLineShowAnswer : undefined,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext, onLineByLineShowAnswer]);
+  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, currentChildIsLblNext, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext]);
 
   if (!todaySelectedTag) {
     return null;
@@ -861,8 +844,12 @@ const PracticeOverlay = ({
           onPracticeClick={onPracticeClick}
           onSkipClick={onSkipClick}
           onPrevClick={onPrevClick}
-          setShowAnswers={setShowAnswers}
-          showAnswers={showAnswers}
+          setShowAnswers={
+            isLineByLineActive && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers
+          }
+          showAnswers={
+            isLineByLineActive ? (lineByLineIsCardComplete || lineByLineRevealedCount > lineByLineCurrentChildIndex) : showAnswers
+          }
           isDone={isDone}
           hasCards={hasCards}
           onCloseCallback={onCloseCallback}

@@ -1,29 +1,10 @@
 /**
- * LBL (Line by Line) Review Hook — Secondary Queue Controller
- *
- * LBL is a "queue within a queue" (二级队列):
- * - Primary queue (cardQueue + currentIndex): navigated by ←/→, managed by PracticeOverlay
- * - Secondary queue (childUidsList + lineByLineCurrentChildIndex): navigated by ↑/↓, managed by this hook
- *
- * These two queues are fully independent — navigating one does not affect the other.
+ * LBL (Line by Line) Review Hook.
  *
  * Core architecture: child blocks have complete, independent Session Data.
  * - Each child block has its own ((childUid)) entry in the data page
  * - The parent LBL block only stores algorithm, interaction, and nextDueDate
  * - Child blocks can join any deck at any time as independent cards
- * - Parent's algorithm serves as default for children without session data;
- *   children with existing session data use their own algorithm
- *
- * Browsing position vs. due position (decoupled):
- * - lineByLineCurrentChildIndex: user's browsing position, controllable via ↑/↓
- * - findNextDueChildIndex(): next due position, used after grading to auto-advance
- * - Algorithm switching only updates child session data — does NOT reset browsing position
- * - Initialization only runs on card change or first data load, not on algorithm switch
- *
- * Completion state is reversible:
- * - lineByLineIsCardComplete = true when index >= childUidsList.length (all reviewed)
- * - Navigating back with ↑ sets index < length, making lineByLineIsCardComplete = false
- * - This restores grading ability, allowing re-grading with overwrite
  *
  * Auto-skip logic:
  * - Due/unread child blocks: require user interaction (Show Answer + grade / Read+Next)
@@ -38,6 +19,13 @@
  * Algorithm independence principle:
  * - Each algorithm only operates on its own fields; other algorithm fields are passed through unchanged
  * - sessionOverrides must include algorithm and interaction to ensure card mode is not lost after reinsertion
+ *
+ * Dual-queue architecture:
+ * - Primary queue: cardQueue + currentIndex, navigated via ◀/▶ (←/→)
+ * - Secondary queue: childUidsList + lineByLineCurrentChildIndex, navigated via ▲/▼ (↑/↓)
+ * - The two queues are fully independent and parallel
+ * - ▲/▼ only change the viewing position; grading advances to the next due child block
+ * - Card change triggers position reset (needsPositioningRef); algorithm switch does not
  */
 import * as React from 'react';
 import { SchedulingAlgorithm, InteractionStyle, Session, isGradingAlgorithm } from '~/models/session';
@@ -156,31 +144,24 @@ export default function useLineByLineReview({
 
   const dueChildCount = dueChildIndices.length;
 
-  const prevCardRefUidRef = React.useRef<string | undefined>(currentCardRefUid);
-  const hasInitializedForCardRef = React.useRef(false);
+  const needsPositioningRef = React.useRef(true);
 
   React.useEffect(() => {
     if (!isLBLReviewMode || !childUidsList.length) {
       setLineByLineRevealedCount(0);
       setLineByLineCurrentChildIndex(0);
-      hasInitializedForCardRef.current = false;
-      prevCardRefUidRef.current = currentCardRefUid;
+      needsPositioningRef.current = false;
       return;
     }
+    needsPositioningRef.current = true;
+  }, [isLBLReviewMode, currentCardRefUid, childUidsList]);
 
-    const cardChanged = prevCardRefUidRef.current !== currentCardRefUid;
-    prevCardRefUidRef.current = currentCardRefUid;
+  React.useEffect(() => {
+    if (!isLBLReviewMode || !childUidsList.length) return;
+    if (!needsPositioningRef.current) return;
+    if (!Object.keys(childSessionData).length) return;
 
-    if (cardChanged) {
-      hasInitializedForCardRef.current = false;
-    }
-
-    if (hasInitializedForCardRef.current) return;
-
-    if (!Object.keys(childSessionData).length) {
-      setLineByLineCurrentChildIndex(0);
-      return;
-    }
+    needsPositioningRef.current = false;
 
     const firstDueIndex = findNextDueChildIndex(childUidsList, childSessionData, 0);
     setLineByLineCurrentChildIndex(firstDueIndex);
@@ -190,10 +171,7 @@ export default function useLineByLineReview({
     } else {
       setLineByLineRevealedCount(firstDueIndex);
     }
-
-    hasInitializedForCardRef.current = true;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLBLReviewMode, currentCardRefUid, childUidsList, childSessionData]);
+  }, [isLBLReviewMode, childUidsList, childSessionData, currentChildIsLblNext]);
 
   const lineByLineIsCardComplete =
     isLBLReviewMode && lineByLineCurrentChildIndex >= childUidsList.length;

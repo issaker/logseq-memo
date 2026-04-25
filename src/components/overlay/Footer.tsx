@@ -49,10 +49,8 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext, onLineByLineShowAnswer } = React.useContext(MainContext);
+  const { fixed_multiplier, fixed_unit, baseCardData, currentChildAlgorithm, isLineByLine, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext } = React.useContext(MainContext);
   const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
-
-  const effectiveAlgorithm = isLineByLine ? (currentChildAlgorithm || algorithmFromSession) : algorithmFromSession;
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
 
@@ -67,13 +65,9 @@ const Footer = ({
 
   const showAnswerFn = React.useMemo(() => {
     return () => {
-      if (isLineByLine && onLineByLineShowAnswer) {
-        onLineByLineShowAnswer();
-      } else {
-        setShowAnswers(true);
-      }
+      setShowAnswers(true);
     };
-  }, [setShowAnswers, isLineByLine, onLineByLineShowAnswer]);
+  }, [setShowAnswers]);
   const gradeFn = React.useMemo(
     () => (grade) => {
       let key;
@@ -123,7 +117,7 @@ const Footer = ({
           if (!showAnswers) {
             activateButtonFn('space-button', showAnswerFn);
           } else {
-            if (!isGradingAlgorithm(effectiveAlgorithm)) {
+            if (!isGradingAlgorithm(algorithmFromSession)) {
               intervalPractice();
             } else {
               gradeFn(5);
@@ -149,7 +143,7 @@ const Footer = ({
         label: 'Previous',
         onKeyDown: onPrevClick,
       },
-      // ↑/↓: secondary queue navigation (LBL child blocks), independent of ←/→ primary queue
+      /** LBL secondary queue navigation: ↑/↓ navigate between child blocks */
       {
         combo: 'up',
         global: true,
@@ -177,31 +171,31 @@ const Footer = ({
         global: true,
         label: 'Grade 0',
         onKeyDown: () => gradeFn(0),
-        disabled: !isGradingAlgorithm(effectiveAlgorithm),
+        disabled: !isGradingAlgorithm(algorithmFromSession),
       },
       {
         combo: 'H',
         global: true,
         label: 'Grade 2',
         onKeyDown: () => gradeFn(2),
-        disabled: !isGradingAlgorithm(effectiveAlgorithm),
+        disabled: !isGradingAlgorithm(algorithmFromSession),
       },
       {
         combo: 'G',
         global: true,
         label: 'Grade 4',
         onKeyDown: () => gradeFn(4),
-        disabled: !isGradingAlgorithm(effectiveAlgorithm),
+        disabled: !isGradingAlgorithm(algorithmFromSession),
       },
       {
         combo: 'E',
         global: true,
         label: 'Edit Interval',
         onKeyDown: toggleIntervalEditorOpen,
-        disabled: !isFixedTimeAlgorithm(effectiveAlgorithm),
+        disabled: !isFixedTimeAlgorithm(algorithmFromSession),
       },
     ],
-    [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn, effectiveAlgorithm, isLineByLine, onLineByLinePrev, onLineByLineNext]
+    [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn, algorithmFromSession, isLineByLine, onLineByLinePrev, onLineByLineNext]
   );
   const { handleKeyDown, handleKeyUp } = Blueprint.useHotkeys(hotkeys);
 
@@ -325,14 +319,6 @@ const FinishedControls = ({ onStartCrammingClick, onCloseCallback }) => {
   );
 };
 
-/**
- * LblCompletedControls — shown when all LBL child blocks are reviewed.
- *
- * ▲ button: navigates back to previous child block (secondary queue ↑),
- *           which sets lineByLineIsCardComplete=false and restores grading ability.
- * ▼ button: disabled (no more lines after the last).
- * ◀/▶ buttons: primary queue navigation (←/→).
- */
 const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLinePrev, onLineByLineNext: _onLineByLineNext }) => (
   <div className="flex items-center gap-3">
     <button
@@ -356,6 +342,7 @@ const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLinePrev, onLi
     >
       ◀
     </button>
+    {/* LBL secondary queue navigation: ▲ navigates back to previous lines for re-review */}
     <button
       type="button"
       aria-label="Previous Line"
@@ -420,13 +407,6 @@ const LblCompletedControls = ({ onPrevClick, onNextClick, onLineByLinePrev, onLi
   </div>
 );
 
-/**
- * GradingControlsWrapper — main grading UI with dual-queue navigation.
- *
- * ◀/▶: primary queue navigation (←/→ between cards)
- * ▲/▼: secondary queue navigation (↑/↓ between LBL child blocks, LBL only)
- * The two navigation systems are fully independent.
- */
 const GradingControlsWrapper = ({
   activeButtonKey,
   skipFn,
@@ -439,10 +419,8 @@ const GradingControlsWrapper = ({
 }) => {
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
-  const { isLineByLine, onLineByLinePrev, onLineByLineNext, currentChildIsLblNext, currentChildAlgorithm } = React.useContext(MainContext);
-  const effectiveAlgorithm = isLineByLine ? (currentChildAlgorithm || algorithm) : algorithm;
-  const effectiveInteraction = isLineByLine ? InteractionStyle.NORMAL : interaction;
-  const isAutoAdvanceMode = !isGradingAlgorithm(effectiveAlgorithm);
+  const isAutoAdvanceMode = !isGradingAlgorithm(algorithm);
+  const { isLineByLine, onLineByLinePrev, onLineByLineNext, currentChildIsLblNext } = React.useContext(MainContext);
   const isLblNextActive = isLBLReviewMode(interaction) && currentChildIsLblNext;
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
@@ -488,6 +466,7 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
+      {/* LBL secondary queue navigation buttons: ▲/▼ navigate between child blocks */}
       {isLineByLine && (
         <>
           <button
@@ -556,11 +535,11 @@ const GradingControlsWrapper = ({
         />
       )}
       <AlgorithmSelector
-        algorithm={effectiveAlgorithm}
+        algorithm={algorithm}
         onSelectAlgorithm={onSelectAlgorithm || (() => {})}
       />
       <InteractionSelector
-        interaction={effectiveInteraction}
+        interaction={interaction}
         onSelectInteraction={onSelectInteraction || (() => {})}
       />
     </div>

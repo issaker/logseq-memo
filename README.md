@@ -44,8 +44,8 @@ This is a modified version of the original Memo plugin. Load it using the `{{[[r
 | Good | `g` | SM2 only |
 | Skip | `s` / `→` | |
 | Previous card | `←` | |
-| Previous line | `↑` | LBL only |
-| Next line | `↓` | LBL only |
+| Previous line | `↑` | LBL mode only |
+| Next line | `↓` | LBL mode only |
 | Breadcrumbs | `b` | |
 | Close memo | `esc` | |
 | Edit interval | `e` | Fixed Time only |
@@ -119,50 +119,37 @@ All definitions are in `src/models/session.ts`.
 | Style | Description |
 |-------|-------------|
 | `NORMAL` | Standard card review — show question, reveal answer |
-| `LBL` | Line-by-Line — per-child Q&A with independent scheduling and vertical navigation |
+| `LBL` | Line-by-Line — per-child Q&A with independent scheduling |
 
 **LBL behavior is determined by the algorithm**:
 - **LBL + SM2**: Show parent, reveal children one at a time, grade each with SM2 buttons. "Forgot" reinserts card into queue.
 - **LBL + Progressive/Fixed Time**: First unread child auto-revealed, click "Next" to advance with automatic reinsertion.
 
-**LBL vertical navigation**: Use `↑`/`↓` keys or `▲`/`▼` buttons to navigate between child blocks within an LBL card. This is independent of the `←`/`→` horizontal navigation between cards. Navigating back to a previously graded child block allows re-grading (with overwrite reminder).
-
 > The `READ` (Incremental Read) interaction has been removed — its functionality is now covered by `LBL + Progressive/Fixed Time`.
-
-### LBL Secondary Queue Architecture
-
-LBL mode is fundamentally a **queue within a queue** — a two-level navigation system:
-
-```
-Primary Queue (cardQueue):  [Card1, Card2, LBL-Card, Card3, ...]
-                                            │
-                                            ▼
-Secondary Queue (childUidsList): [Child0, Child1, Child2, Child3]
-                                  ▲                        ▲
-                                  │                        │
-                          currentChildIndex         nextDueChildIndex
-                          (user browsing pos)      (next due position)
-```
-
-| Dimension | Primary Queue (←/→) | Secondary Queue (↑/↓) |
-|-----------|---------------------|----------------------|
-| Navigation | Between cards | Between child blocks |
-| Keys | `←` / `→` | `↑` / `↓` |
-| Buttons | `◀` / `▶` | `▲` / `▼` |
-| Scope | Entire `cardQueue` | Current LBL card's `childUidsList` |
-| Grading | No grading on navigate | No grading on navigate |
-
-**Key architectural principles**:
-
-1. **Parent block**: Determines whether LBL mode is active (via `interaction` field). Its `algorithm` serves as the default for child blocks without session data.
-2. **Child blocks**: Each is an independent Q&A card with its own `algorithm` and session data. If a child already has session data, its own algorithm takes priority over the parent's.
-3. **Three algorithms per card**: SM2 / Progressive / FixedTime — each algorithm operates independently on every card (or child block).
-4. **Decoupled browsing vs. due position**: `lineByLineCurrentChildIndex` tracks the user's browsing position (controllable via ↑/↓), while `findNextDueChildIndex` tracks the next due position (used after grading to auto-advance). Algorithm switching only updates the child's session data — it does NOT reset the browsing position.
-5. **Completion state is reversible**: When all child blocks are reviewed, `lineByLineIsCardComplete` is true. Navigating back with ↑ sets it to false, restoring grading ability.
-6. **Overwrite on re-grade**: Re-grading a child block that was already reviewed today overwrites the existing session data (same-day deduplication). An overwrite reminder is shown.
 
 #### Dynamic Switching
 Each card's `algorithm` and `interaction` are stored in the latest session block. Changes take effect immediately on card navigation via two independent selectors (bottom-right of grading area).
+
+#### LBL Dual-Queue Architecture
+
+LBL (Line-by-Line) mode implements a **dual-queue navigation system** — a secondary queue nested within the primary card queue:
+
+| Dimension | Primary Queue | Secondary Queue (LBL) |
+|-----------|--------------|----------------------|
+| Navigation | ◀ / ▶ (← / →) | ▲ / ▼ (↑ / ↓) |
+| Scope | Cards in `cardQueue` | Child blocks in `childUidsList` |
+| Grading | No grading on navigation | No grading on navigation |
+| Completion | Advances to next card | Advances to next due child block |
+
+**Key principles**:
+- The primary queue (`cardQueue` + `currentIndex`) manages navigation between cards via ◀/▶
+- The secondary queue (`childUidsList` + `lineByLineCurrentChildIndex`) manages navigation between child blocks via ▲/▼
+- The two navigation systems are fully independent and parallel
+- Parent block determines LBL mode activation; its algorithm serves as the default for child blocks without session data
+- Each child block is an independent Q&A card with its own algorithm and session data
+- Navigating up/down only changes the viewing position; grading is triggered separately
+- After grading, the system auto-advances to the next due child block
+- Re-grading a previously studied child block overrides its session data (with on-screen reminder)
 
 ### Data Model
 
