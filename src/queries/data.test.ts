@@ -187,6 +187,80 @@ describe('getPluginPageData', () => {
     });
   });
 
+  it('merges sparse historical sessions into complete snapshots for migration reads', async () => {
+    Object.defineProperty(window, 'roamAlphaAPI', {
+      value: {
+        q: jest.fn(() => [
+          [
+            {
+              children: [
+                {
+                  string: '((card-switching))',
+                  children: [
+                    {
+                      string: '[[April 12th, 2026]] 🔴',
+                      order: 2,
+                      children: [
+                        { string: 'algorithm:: SM2' },
+                        { string: 'interaction:: NORMAL' },
+                        { string: 'sm2_repetitions:: 3' },
+                        { string: 'sm2_interval:: 12' },
+                        { string: 'sm2_eFactor:: 2.4' },
+                        { string: 'sm2_grade:: 4' },
+                      ],
+                    },
+                    {
+                      string: '[[April 13th, 2026]] 🔴',
+                      order: 1,
+                      children: [
+                        { string: 'algorithm:: FIXED_TIME' },
+                        { string: 'interaction:: LBL' },
+                        { string: 'fixed_multiplier:: 5' },
+                        { string: 'fixed_unit:: weeks' },
+                      ],
+                    },
+                    {
+                      string: '[[April 14th, 2026]] 🟢',
+                      order: 0,
+                      children: [
+                        { string: 'algorithm:: PROGRESSIVE' },
+                        { string: 'progressive_repetitions:: 1' },
+                        { string: 'progressive_interval:: 6' },
+                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        ]),
+        util: {
+          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
+        },
+      },
+      writable: true,
+    });
+
+    const result = await getPluginPageData({
+      dataPageTitle: 'roam/memo',
+      limitToLatest: false,
+    });
+
+    expect(result['card-switching'][2]).toMatchObject({
+      algorithm: 'PROGRESSIVE',
+      interaction: 'LBL',
+      progressive_repetitions: 1,
+      progressive_interval: 6,
+      sm2_repetitions: 3,
+      sm2_interval: 12,
+      sm2_eFactor: 2.4,
+      sm2_grade: 4,
+      fixed_multiplier: 5,
+      fixed_unit: 'weeks',
+    });
+  });
+
   it('defaults algorithm to PROGRESSIVE and interaction to NORMAL when session block has none', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {

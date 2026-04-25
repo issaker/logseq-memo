@@ -14,9 +14,10 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 18
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -32,9 +33,10 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 18
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run lint
         run: npm run lint
@@ -50,9 +52,10 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 18
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run typecheck
         run: npm run typecheck

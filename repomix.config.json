@@ -11,8 +11,7 @@
   "include": [],
   "ignore": {
     "useGitignore": true,
-    "useDefaultPatterns": true,
-    "customPatterns": ["src/lotties"]
+    "useDefaultPatterns": true
   },
   "security": {
     "enableSecurityCheck": true

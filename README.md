@@ -295,13 +295,22 @@ After upgrading to the `SchedulingAlgorithm × InteractionStyle` architecture, r
 ## Development
 
 ```bash
-npm install
+nvm use            # optional, reads .nvmrc (Node 18)
+npm ci
 npm run dev          # Development mode (watch & rebuild on change)
-npm run build        # Production build → build/extension.js
+npm run build        # Production build → ./extension.js
 npm run lint         # Run ESLint on all source files
 npm run typecheck    # TypeScript type checking
 npm run test         # Run tests
+npm run check        # Local CI parity: lint + typecheck + test
 ```
+
+### Local Dev Notes
+
+- Node `18+` is required for local development and matches CI.
+- No `.env` file is required for this plugin.
+- Shared editor defaults live in `.vscode/settings.json` and `.vscode/extensions.json`.
+- CI uses `npm ci`, so local dependency troubleshooting should start with `rm -rf node_modules && npm ci`.
 
 ### Project Structure
 

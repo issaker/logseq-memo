@@ -341,7 +341,6 @@ export default function useLineByLineReview({
       setChildSessionData,
       setCardQueue,
       setShowAnswers,
-      hasLoadedChildSessionsForCurrentCard,
     ]
   );
 

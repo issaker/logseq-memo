@@ -22,37 +22,6 @@ import useBlockInfo from '~/hooks/useBlockInfo';
 import * as asyncUtils from '~/utils/async';
 import * as dateUtils from '~/utils/date';
 import * as stringUtils from '~/utils/string';
-
-class DoneAnimationErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
-  state = { hasError: false };
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children;
-  }
-}
-
-const LOTTIE_STYLE = { height: 150, width: 'auto' as const, maxHeight: '40vh' };
-const LOTTIE_BASE_OPTIONS = {
-  loop: true,
-  autoplay: true,
-  rendererSettings: { preserveAspectRatio: 'xMidYMid meet' as const },
-};
-
-import Lottie from 'react-lottie';
-import doneAnimationData from '~/lotties/done.json';
-
-const DoneAnimation = () => (
-  <Lottie
-    options={{ ...LOTTIE_BASE_OPTIONS, animationData: doneAnimationData }}
-    style={LOTTIE_STYLE}
-  />
-);
 import mediaQueries from '~/utils/mediaQueries';
 
 import CardBlock from '~/components/overlay/CardBlock';
@@ -116,6 +85,26 @@ interface MainContextProps {
 
 // Stable reference: prevent inline functions from invalidating React.memo
 const NOOP = () => {};
+
+// CSS animation keeps the completion state lightweight; shipping lottie-web for
+// a single terminal-state illustration adds a large bundle cost for little gain.
+const DoneIllustration = () => (
+  <DoneIllustrationWrap aria-hidden="true">
+    <DoneIllustrationHalo />
+    <DoneIllustrationBadge>
+      <Blueprint.Icon icon="endorsed" iconSize={44} />
+    </DoneIllustrationBadge>
+    <DoneIllustrationSpark $top="-4px" $left="8px">
+      <Blueprint.Icon icon="star" iconSize={12} />
+    </DoneIllustrationSpark>
+    <DoneIllustrationSpark $top="18px" $right="-2px">
+      <Blueprint.Icon icon="star-empty" iconSize={14} />
+    </DoneIllustrationSpark>
+    <DoneIllustrationSpark $bottom="10px" $left="-6px">
+      <Blueprint.Icon icon="endorsed" iconSize={10} />
+    </DoneIllustrationSpark>
+  </DoneIllustrationWrap>
+);
 
 export const MainContext = React.createContext<MainContextProps>({} as MainContextProps);
 
@@ -883,9 +872,7 @@ const PracticeOverlay = ({
             </>
           ) : (
             <div data-testid="practice-overlay-done-state" className="flex items-center flex-col">
-              <DoneAnimationErrorBoundary>
-                <DoneAnimation />
-              </DoneAnimationErrorBoundary>
+              <DoneIllustration />
               <div>
                 You&apos;re all caught up! 🌟{' '}
                 {todaySelectedTag.completed > 0
@@ -1025,6 +1012,63 @@ const MOBILE_OVERLAY_STYLES = `
 const DialogBody = styled.div`
   overflow-x: hidden; // because of tweaks we do in ContentWrapper container overflows
   min-height: 200px;
+`;
+
+const DoneIllustrationWrap = styled.div`
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 140px;
+  height: 140px;
+  margin: 8px 0 16px;
+`;
+
+const DoneIllustrationHalo = styled.div`
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, ${colors.overlayLightHover} 0%, transparent 70%);
+  animation: memoDonePulse 2.2s ease-in-out infinite;
+
+  @keyframes memoDonePulse {
+    0%, 100% { transform: scale(0.92); opacity: 0.5; }
+    50% { transform: scale(1.04); opacity: 1; }
+  }
+`;
+
+const DoneIllustrationBadge = styled.div`
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  color: white;
+  background: linear-gradient(135deg, ${colors.modeProgressive}, ${colors.modeSM2});
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+`;
+
+const DoneIllustrationSpark = styled.div<{
+  $top?: string;
+  $right?: string;
+  $bottom?: string;
+  $left?: string;
+}>`
+  position: absolute;
+  z-index: 2;
+  color: ${colors.modeProgressive};
+  opacity: 0.9;
+  top: ${({ $top }) => $top || 'auto'};
+  right: ${({ $right }) => $right || 'auto'};
+  bottom: ${({ $bottom }) => $bottom || 'auto'};
+  left: ${({ $left }) => $left || 'auto'};
+  animation: memoDoneFloat 2.6s ease-in-out infinite;
+
+  @keyframes memoDoneFloat {
+    0%, 100% { transform: translateY(0); opacity: 0.65; }
+    50% { transform: translateY(-6px); opacity: 1; }
+  }
 `;
 
 const OverwriteReminder = styled.div`
