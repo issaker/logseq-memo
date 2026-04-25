@@ -51,12 +51,28 @@
  * - ▲ (up): revealedCount = newIndex + 1 (hide all lines below)
  * - ▼ (down): revealedCount = max(prev, newIndex + 1) (reveal target line)
  * - Invariant: revealedCount >= currentChildIndex + 1 (current line always rendered)
+ *
+ * Same-day overwrite semantics (baseSessionData):
+ * - When a child block is re-scored on the same day (non-Forgot), generatePracticeData
+ *   MUST use baseSessionData (the pre-today snapshot) as the calculation base, not the
+ *   already-incremented current session data. This prevents data accumulation
+ *   (e.g., progressive_repetitions going 4→5→6 instead of staying at 4).
+ * - Forgot (grade=0) is exempt: it uses current session data because Forgot is a reset action.
+ * - baseSessionData is set by parseLatestSession when the latest session is from today
+ *   and a previous non-today session exists.
+ * - This mirrors the Normal card flow where baseCardData uses baseSessionData for
+ *   same-day re-scoring (see PracticeOverlay.tsx → baseCardData).
+ * - effectiveBaseCardData in PracticeOverlay also uses baseSessionData for Footer
+ *   interval estimates, ensuring consistent display.
+ * - sessionOverrides no longer writes child UIDs (was dead code); child session state
+ *   is managed exclusively through setChildSessionData.
  */
 import * as React from 'react';
 import { SchedulingAlgorithm, InteractionStyle, Session, isGradingAlgorithm } from '~/models/session';
 import { savePracticeData, updateParentNextDueDate } from '~/queries';
 import { generatePracticeData } from '~/practice';
 import { generateNewSession } from '~/queries/utils';
+import * as dateUtils from '~/utils/date';
 
 export const shouldReinsertLblCard = ({
   currentChildIndex,
@@ -213,9 +229,15 @@ export default function useLineByLineReview({
       const existingChildSession = childSessionData[childUid] || generateNewSession({ algorithm: currentChildAlgorithm });
       const now = new Date();
 
+      const isSameDayReScoring = !!existingChildSession.dateCreated
+        && dateUtils.isSameDay(existingChildSession.dateCreated, now);
+
       if (currentChildIsLblNext) {
+        const baseForCalculation = (isSameDayReScoring && existingChildSession.baseSessionData)
+          ? existingChildSession.baseSessionData
+          : existingChildSession;
         const childPracticeProps = {
-          ...existingChildSession,
+          ...baseForCalculation,
           refUid: childUid,
           dataPageTitle,
           algorithm: currentChildAlgorithm,
@@ -243,7 +265,6 @@ export default function useLineByLineReview({
 
         setSessionOverrides((prev) => ({
           ...prev,
-          [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
           [currentCardRefUid]: {
             ...currentCardData,
             algorithm: currentChildAlgorithm,
@@ -285,8 +306,11 @@ export default function useLineByLineReview({
         return;
       }
 
+      const baseForCalculation = (isSameDayReScoring && grade !== 0 && existingChildSession.baseSessionData)
+        ? existingChildSession.baseSessionData
+        : existingChildSession;
       const childPracticeProps = {
-        ...existingChildSession,
+        ...baseForCalculation,
         refUid: childUid,
         dataPageTitle,
         algorithm: currentChildAlgorithm,
@@ -315,7 +339,6 @@ export default function useLineByLineReview({
 
       setSessionOverrides((prev) => ({
         ...prev,
-        [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
         [currentCardRefUid]: {
           ...currentCardData,
           algorithm: currentChildAlgorithm,

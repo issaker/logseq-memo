@@ -298,13 +298,13 @@ const PracticeOverlay = ({
       return;
     }
     let cancelled = false;
-    getChildSessionData({ childUids: childUidsList, dataPageTitle }).then((data) => {
+    getChildSessionData({ childUids: childUidsList, dataPageTitle, existingPluginPageData: practiceData }).then((data) => {
       if (!cancelled) {
         setChildSessionData(data as Record<string, Session>);
       }
     });
     return () => { cancelled = true; };
-  }, [isLineByLineActive, childUidsList, dataPageTitle, currentCardRefUid, currentIndex]);
+  }, [isLineByLineActive, childUidsList, dataPageTitle, currentCardRefUid, currentIndex, practiceData]);
 
   const {
     lineByLineRevealedCount,
@@ -349,7 +349,14 @@ const PracticeOverlay = ({
     if (!currentChildUid) return baseCardData;
     const childSession = childSessionData[currentChildUid];
     if (childSession) {
-      return { ...childSession, algorithm: childSession.algorithm || algorithm };
+      const now = new Date();
+      const isSameDayReScoring = !!childSession.dateCreated
+        && dateUtils.isSameDay(childSession.dateCreated, now)
+        && childSession.sm2_grade !== 0;
+      const baseData = (isSameDayReScoring && childSession.baseSessionData)
+        ? childSession.baseSessionData
+        : childSession;
+      return { ...baseData, algorithm: childSession.algorithm || algorithm };
     }
     return generateNewSession({ algorithm });
   }, [isLineByLineActive, baseCardData, childUidsList, lineByLineCurrentChildIndex, childSessionData, algorithm]);
