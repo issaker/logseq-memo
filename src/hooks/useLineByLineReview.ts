@@ -40,6 +40,13 @@
  * - Switching to SM2 keeps the user at the current line (no back-navigation)
  * - IMPORTANT: When adding new Q&A grading algorithms, follow this same ShowAnswer pattern
  *
+ * ShowAnswer signal unification:
+ * - Footer and CardBlock share the same showAnswers state (PracticeOverlay internal state)
+ * - onLineByLineShowAnswer calls setShowAnswers(true), which triggers both Footer button switch
+ *   and CardBlock content reveal
+ * - lineByLineRevealedCount ONLY controls LineByLineView row rendering range, NOT Footer buttons
+ * - This eliminates the dual-signal-source bug where Footer used revealedCount-based logic
+ *
  * Line rendering control:
  * - ▲ (up): revealedCount = newIndex + 1 (hide all lines below)
  * - ▼ (down): revealedCount = max(prev, newIndex + 1) (reveal target line)

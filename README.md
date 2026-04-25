@@ -122,8 +122,14 @@ All definitions are in `src/models/session.ts`.
 | `LBL` | Line-by-Line — per-child Q&A with independent scheduling |
 
 **LBL behavior is determined by the algorithm**:
-- **LBL + SM2**: Show parent, reveal children one at a time, grade each with SM2 buttons. "Forgot" reinserts card into queue.
-- **LBL + Progressive/Fixed Time**: First unread child auto-revealed, click "Next" to advance with automatic reinsertion.
+
+| Algorithm | LBL Button Bar | Description |
+|-----------|---------------|-------------|
+| SM2 | ShowAnswer → Forgot / Hard / Good / Perfect | Grading-based, same as Normal cards. ShowAnswer appears only when child has sub-content or cloze. |
+| Progressive | Read + Next | Auto-advances on "Next" with Progressive interval calculation. Reinserts card into primary queue after each line. |
+| Fixed Time | Read + Next | Auto-advances on "Next" with FixedTime interval. Reinserts card into primary queue after each line. |
+
+> **Three algorithms, three distinct button bars — no mixing.** Progressive and FixedTime both use "Read + Next" in LBL mode because the per-child interval is calculated automatically. In Normal mode, Progressive uses "Review + Next" and FixedTime uses "Change Interval + Next".
 
 > The `READ` (Incremental Read) interaction has been removed — its functionality is now covered by `LBL + Progressive/Fixed Time`.
 

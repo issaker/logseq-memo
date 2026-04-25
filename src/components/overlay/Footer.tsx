@@ -419,10 +419,12 @@ const GradingControlsWrapper = ({
 }) => {
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
-  const { isLineByLine, onLineByLinePrev, onLineByLineNext, currentChildIsLblNext, baseCardData, currentChildAlgorithm } = React.useContext(MainContext);
+  const { isLineByLine, onLineByLinePrev, onLineByLineNext, currentChildIsLblNext, currentChildAlgorithm } = React.useContext(MainContext);
   const effectiveAlgorithm = isLineByLine ? currentChildAlgorithm : algorithm;
   const isAutoAdvanceMode = !isGradingAlgorithm(effectiveAlgorithm);
-  const effectiveInteraction = isLineByLine ? (baseCardData?.interaction || interaction) : interaction;
+  // effectiveInteraction directly uses parent-level interaction — child blocks never store interaction.
+  // This prevents child block data pollution (e.g. interaction:NORMAL) from breaking isLblNextActive.
+  const effectiveInteraction = interaction;
   const isLblNextActive = isLBLReviewMode(effectiveInteraction) && currentChildIsLblNext;
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
@@ -528,6 +530,7 @@ const GradingControlsWrapper = ({
           isIntervalEditorOpen={isIntervalEditorOpen}
           toggleIntervalEditorOpen={toggleIntervalEditorOpen}
           intervalEstimates={intervalEstimates}
+          effectiveAlgorithm={effectiveAlgorithm}
         />
       ) : (
         <SpacedIntervalModeControls
@@ -692,16 +695,19 @@ const FixedIntervalModeControls = ({
   isIntervalEditorOpen,
   toggleIntervalEditorOpen,
   intervalEstimates,
+  effectiveAlgorithm,
 }: {
   activeButtonKey: string;
   intervalPractice: () => void;
   isIntervalEditorOpen: boolean;
   toggleIntervalEditorOpen: () => void;
   intervalEstimates: IntervalEstimates;
+  effectiveAlgorithm: SchedulingAlgorithm | undefined;
 }): JSX.Element => {
   const { fixed_multiplier, fixed_unit } = React.useContext(MainContext);
-  const { algorithm } = usePracticeSession();
-  const isProgressive = algorithm === SchedulingAlgorithm.PROGRESSIVE;
+  // Uses effectiveAlgorithm from parent context (not usePracticeSession().algorithm)
+  // to remain consistent with the rendering decision chain that selects this component.
+  const isProgressive = effectiveAlgorithm === SchedulingAlgorithm.PROGRESSIVE;
   const onInteractionhandler = (nextState) => {
     if (!nextState && isIntervalEditorOpen) toggleIntervalEditorOpen();
   };
@@ -722,7 +728,7 @@ const FixedIntervalModeControls = ({
         >
           <span className="ml-2">
             <IntervalString
-              algorithm={algorithm}
+              algorithm={effectiveAlgorithm}
               fixed_multiplier={fixed_multiplier}
               fixed_unit={fixed_unit}
               nextDueDate={intervalEstimates[0]?.nextDueDate}
@@ -742,7 +748,7 @@ const FixedIntervalModeControls = ({
           >
             <span className="ml-2">
               <IntervalString
-                algorithm={algorithm}
+                algorithm={effectiveAlgorithm}
                 fixed_multiplier={fixed_multiplier}
                 fixed_unit={fixed_unit}
                 nextDueDate={intervalEstimates[0]?.nextDueDate}

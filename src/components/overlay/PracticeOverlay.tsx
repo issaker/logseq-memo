@@ -848,6 +848,8 @@ const PracticeOverlay = ({
         {showOverwriteReminder && (
           <OverwriteReminder>今日已学习，此次学习将覆盖今日数据</OverwriteReminder>
         )}
+        {/* LBL showAnswers unified: internal showAnswers state controls both CardBlock and Footer.
+            lineByLineRevealedCount only controls LineByLineView row rendering range. */}
         <Footer
           refUid={currentCardRefUid}
           onPracticeClick={onPracticeClick}
@@ -856,9 +858,7 @@ const PracticeOverlay = ({
           setShowAnswers={
             isLineByLineActive && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers
           }
-          showAnswers={
-            isLineByLineActive ? (lineByLineIsCardComplete || lineByLineRevealedCount > lineByLineCurrentChildIndex) : showAnswers
-          }
+          showAnswers={showAnswers}
           isDone={isDone}
           hasCards={hasCards}
           onCloseCallback={onCloseCallback}
