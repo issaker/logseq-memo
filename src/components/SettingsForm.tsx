@@ -77,24 +77,6 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <h5 style={{ margin: '0 0 10px 0' }}>Data Page Title</h5>
-          <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-            Name of page where we&apos;ll store all your data
-          </p>
-          <input
-            type="text"
-            className="bp3-input"
-            value={formSettings.dataPageTitle}
-            onChange={(e) => {
-              const value = e.target.value;
-              setFormSettings((prev) => ({ ...prev, dataPageTitle: value }));
-            }}
-            placeholder="roam/memo"
-            style={{ width: '100%' }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
           <h5 style={{ margin: '0 0 10px 0' }}>Daily Review Limit</h5>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
             Number of cards to review each day. 0 means no limit. When set, each deck receives a proportional share based on its Weight %.
@@ -108,6 +90,24 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
               setFormSettings((prev) => ({ ...prev, dailyLimit: value }));
             }}
             placeholder="0"
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <h5 style={{ margin: '0 0 10px 0' }}>Data Page Title</h5>
+          <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
+            Name of page where we&apos;ll store all your data
+          </p>
+          <input
+            type="text"
+            className="bp3-input"
+            value={formSettings.dataPageTitle}
+            onChange={(e) => {
+              const value = e.target.value;
+              setFormSettings((prev) => ({ ...prev, dataPageTitle: value }));
+            }}
+            placeholder="roam/memo"
             style={{ width: '100%' }}
           />
         </div>
