@@ -65,7 +65,8 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
         <div style={{ marginBottom: '20px' }}>
           <h5 style={{ margin: '0 0 10px 0' }}>Tag Pages (Decks)</h5>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 8px 0' }}>
-            Each deck&apos;s Weight % determines its share of the daily review limit. All weights sum to 100%. Set a deck&apos;s weight to 0 to disable its review quota.
+            Each deck&apos;s Weight % determines its share of the daily review limit. All weights
+            sum to 100%. Set a deck&apos;s weight to 0 to disable its review quota.
           </p>
           <DeckConfigsTable
             deckConfigs={formSettings.deckConfigs}
@@ -79,7 +80,8 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
         <div style={{ marginBottom: '20px' }}>
           <h5 style={{ margin: '0 0 10px 0' }}>Daily Review Limit</h5>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-            Number of cards to review each day. 0 means no limit. When set, each deck receives a proportional share based on its Weight %.
+            Number of cards to review each day. 0 means no limit. When set, each deck receives a
+            proportional share based on its Weight %.
           </p>
           <input
             type="number"
@@ -90,6 +92,47 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
               setFormSettings((prev) => ({ ...prev, dailyLimit: value }));
             }}
             placeholder="0"
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <h5 style={{ margin: '0 0 10px 0' }}>Reinsert &quot;Forgot&quot; Cards After N Cards</h5>
+          <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
+            When you mark a card as &quot;Forgot&quot;, it will be reinserted into the current
+            review session N cards later. Set to 0 to disable.
+          </p>
+          <input
+            type="number"
+            className="bp3-input"
+            value={formSettings.forgotReinsertOffset}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              setFormSettings((prev) => ({ ...prev, forgotReinsertOffset: value }));
+            }}
+            placeholder="3"
+            style={{ width: '100%' }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <h5 style={{ margin: '0 0 10px 0' }}>
+            Reinsert &quot;LBL Next&quot; Cards After N Cards
+          </h5>
+          <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
+            When you click &quot;Next&quot; on an LBL + Progressive/Fixed card, it will be
+            reinserted into the current review session N cards later. Set to 0 to review all lines
+            consecutively on the same card (like SM2 LBL mode).
+          </p>
+          <input
+            type="number"
+            className="bp3-input"
+            value={formSettings.lblNextReinsertOffset}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              setFormSettings((prev) => ({ ...prev, lblNextReinsertOffset: value }));
+            }}
+            placeholder="3"
             style={{ width: '100%' }}
           />
         </div>
@@ -113,49 +156,6 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <h5 style={{ margin: '0 0 10px 0' }}>
-            Reinsert &quot;Forgot&quot; Cards After N Cards
-          </h5>
-          <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-            When you mark a card as &quot;Forgot&quot;, it will be reinserted into the current
-            review session N cards later. Set to 0 to disable.
-          </p>
-          <input
-            type="number"
-            className="bp3-input"
-            value={formSettings.forgotReinsertOffset}
-            onChange={(e) => {
-              const value = Number(e.target.value);
-              setFormSettings((prev) => ({ ...prev, forgotReinsertOffset: value }));
-            }}
-            placeholder="3"
-            style={{ width: '100%' }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <h5 style={{ margin: '0 0 10px 0' }}>
-            Reinsert &quot;LBL Next&quot; Cards After N Cards
-          </h5>
-          <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-            When you click &quot;Next&quot; on an LBL + Progressive/Fixed card, it will be reinserted
-            into the current review session N cards later. Set to 0 to review all lines
-            consecutively on the same card (like SM2 LBL mode).
-          </p>
-          <input
-            type="number"
-            className="bp3-input"
-            value={formSettings.lblNextReinsertOffset}
-            onChange={(e) => {
-              const value = Number(e.target.value);
-              setFormSettings((prev) => ({ ...prev, lblNextReinsertOffset: value }));
-            }}
-            placeholder="3"
-            style={{ width: '100%' }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
           <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
             <input
               type="checkbox"
@@ -174,7 +174,10 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
                   if (value) {
                     const hasDailyNote = updatedConfigs.some((d) => d.name === 'DailyNote');
                     if (!hasDailyNote) {
-                      updatedConfigs = [...updatedConfigs, { name: 'DailyNote', swapQA: false, weight: 0 }];
+                      updatedConfigs = [
+                        ...updatedConfigs,
+                        { name: 'DailyNote', swapQA: false, weight: 0 },
+                      ];
                       const weights = equalizeWeights(updatedConfigs.length);
                       updatedConfigs = updatedConfigs.map((d, i) => ({ ...d, weight: weights[i] }));
                     }
@@ -186,7 +189,11 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
                     }
                   }
 
-                  return { ...prev, dailynoteEnabled: value, deckConfigs: JSON.stringify(updatedConfigs) };
+                  return {
+                    ...prev,
+                    dailynoteEnabled: value,
+                    deckConfigs: JSON.stringify(updatedConfigs),
+                  };
                 });
               }}
               style={{ marginRight: '8px' }}
@@ -213,7 +220,8 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
             <span>Auto Collapse Blocks After Review</span>
           </label>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
-            Automatically collapse blocks on the Roam page after reviewing them, keeping your page tidy. In Line-by-Line mode, only the current sub-block stays expanded.
+            Automatically collapse blocks on the Roam page after reviewing them, keeping your page
+            tidy. In Line-by-Line mode, only the current sub-block stays expanded.
           </p>
         </div>
 
@@ -232,7 +240,8 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
             <span>Show Review Mode Borders</span>
           </label>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
-            Show the colored dialog border that marks the current card&apos;s algorithm (green=SM2, orange=Progressive, blue=Fixed Time).
+            Show the colored dialog border that marks the current card&apos;s algorithm (green=SM2,
+            orange=Progressive, blue=Fixed Time).
           </p>
         </div>
 
