@@ -203,6 +203,8 @@ export default function useLineByLineReview({
           lineByLineCurrentChildIndex + 1
         ).nextDueChildIndex;
 
+        const isCardComplete = nextDueIndex >= childUidsList.length;
+
         if (
           shouldReinsertLblCard({
             currentChildIndex: lineByLineCurrentChildIndex,
@@ -218,11 +220,13 @@ export default function useLineByLineReview({
             newQueue.splice(targetIndex, 0, currentCardRefUid);
             return newQueue;
           });
+          setCurrentIndex((prev) => prev + 1);
+        } else if (isCardComplete) {
+          setCurrentIndex((prev) => prev + 1);
         }
 
-        setCurrentIndex((prev) => prev + 1);
         setLineByLineCurrentChildIndex(nextDueIndex);
-        setLineByLineRevealedCount(nextDueIndex + 1);
+        setLineByLineRevealedCount(isCardComplete ? nextDueIndex : nextDueIndex + 1);
         return;
       }
 

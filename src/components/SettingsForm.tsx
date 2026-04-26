@@ -139,7 +139,8 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
           </h5>
           <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
             When you click &quot;Next&quot; on an LBL + Progressive/Fixed card, it will be reinserted
-            into the current review session N cards later. Set to 0 to disable.
+            into the current review session N cards later. Set to 0 to review all lines
+            consecutively on the same card (like SM2 LBL mode).
           </p>
           <input
             type="number"
