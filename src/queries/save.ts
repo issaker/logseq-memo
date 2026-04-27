@@ -110,12 +110,9 @@ const upsertLatestSessionField = async ({
 
   if (!dateBlocks.length) {
     const dateStr = stringUtils.dateToRoamDateString(new Date());
-    const sessionBlockUid = await createChildBlock(
-      cardDataBlockUid,
-      `[[${dateStr}]] ⚪`,
-      0,
-      { open: false }
-    );
+    const sessionBlockUid = await createChildBlock(cardDataBlockUid, `[[${dateStr}]] ⚪`, 0, {
+      open: false,
+    });
     await createChildBlock(sessionBlockUid, `${key}:: ${value}`, -1);
     return;
   }
@@ -150,6 +147,12 @@ const upsertLatestSessionField = async ({
  * delete old child fields before rewriting, rather than creating a new date block.
  * This prevents duplicate session blocks for the same card on the same day.
  *
+ * Forgot record preservation:
+ * If the existing same-day session is a Forgot (sm2_grade === 0) and the new grade is
+ * non-Forgot, create a new session block instead of overwriting. This preserves the
+ * Forgot history so the SM2 algorithm can account for it in subsequent calculations.
+ * The Forgot session block serves as baseSessionData for same-day re-scoring.
+ *
  * Field integrity protection:
  * Before rewriting, verify that the write data covers all existing fields in SESSION_SNAPSHOT_KEYS.
  * Missing fields are backfilled from the existing child blocks of the same-day session block,
@@ -179,15 +182,35 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
   );
 
   const children = existingCardChildren?.[0]?.[0]?.children || [];
-  const todayBlock = children.find((c) => {
-    if (!c?.string) return false;
-    const dateStr = stringUtils.getStringBetween(c.string, '[[', ']]');
-    return dateStr === dateCreatedRoamDateString;
-  });
+  const todayBlocks = children
+    .filter((c) => {
+      if (!c?.string) return false;
+      const dateStr = stringUtils.getStringBetween(c.string, '[[', ']]');
+      return dateStr === dateCreatedRoamDateString;
+    })
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const todayBlock = todayBlocks[0];
+
+  let existingGrade: number | undefined;
+  if (todayBlock?.children) {
+    for (const child of todayBlock.children) {
+      if (child?.string) {
+        const [key, value] = stringUtils.parseConfigString(child.string);
+        if (key === 'sm2_grade') {
+          existingGrade = typeof value === 'number' ? value : Number(value);
+          break;
+        }
+      }
+    }
+  }
+
+  const isExistingForgot = existingGrade === 0;
+  const isNewGradeNonForgot = data.sm2_grade !== undefined && data.sm2_grade !== 0;
+  const shouldPreserveForgot = isExistingForgot && isNewGradeNonForgot;
 
   let sessionBlockUid: string;
 
-  if (todayBlock) {
+  if (todayBlock && !shouldPreserveForgot) {
     sessionBlockUid = todayBlock.uid;
     await window.roamAlphaAPI.updateBlock({
       block: { uid: todayBlock.uid, string: sessionBlockTitle },
@@ -214,7 +237,6 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
         }
       }
 
-      // Promise.all: delete child blocks in parallel, reduces serial wait time
       await Promise.all(
         todayBlock.children
           .filter((child) => child?.uid)
@@ -222,15 +244,15 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
       );
     }
   } else {
-    sessionBlockUid = await createChildBlock(
-      cardDataBlockUid,
-      sessionBlockTitle,
-      0,
-      { open: false }
-    );
+    sessionBlockUid = await createChildBlock(cardDataBlockUid, sessionBlockTitle, 0, {
+      open: false,
+    });
   }
 
-  const nextDueDate = data.nextDueDate !== undefined ? data.nextDueDate : dateUtils.addDays(referenceDate, data.sm2_interval);
+  const nextDueDate =
+    data.nextDueDate !== undefined
+      ? data.nextDueDate
+      : dateUtils.addDays(referenceDate, data.sm2_interval);
 
   // Promise.all: create child blocks in parallel, reduces serial wait time
   const fieldEntries = Object.keys(data)

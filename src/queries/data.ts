@@ -284,25 +284,54 @@ const parseLatestSession = (sessionChildren, uid) => {
 
   const now = new Date();
   if (dateUtils.isSameDay(rawRecord.dateCreated, now) && sortedSessionChildren.length > 1) {
+    let sameDayForgotSession: Record<string, any> | null = null;
+    let prevDaySession: Record<string, any> | null = null;
+
     for (let i = 1; i < sortedSessionChildren.length; i++) {
       const prevChild = sortedSessionChildren[i];
       if (!prevChild?.string) continue;
       const prevDateStr = getStringBetween(prevChild.string, '[[', ']]');
       const prevDate = parseRoamDateString(prevDateStr);
-      if (prevDate && !dateUtils.isSameDay(prevDate, now)) {
-        const prevRecord: Record<string, any> = {
-          refUid: uid,
-          dateCreated: prevDate,
-        };
-        if (prevChild.children) {
-          parseFieldValuesFromChildren(prevRecord, prevChild.children);
+      if (!prevDate) continue;
+
+      if (dateUtils.isSameDay(prevDate, now)) {
+        if (!sameDayForgotSession) {
+          const prevRecord: Record<string, any> = {
+            refUid: uid,
+            dateCreated: prevDate,
+          };
+          if (prevChild.children) {
+            parseFieldValuesFromChildren(prevRecord, prevChild.children);
+          }
+          const prevConfig = resolveReviewConfig(prevRecord.algorithm, prevRecord.interaction);
+          prevRecord.algorithm = prevConfig.algorithm;
+          prevRecord.interaction = prevConfig.interaction;
+          if (prevRecord.sm2_grade === 0) {
+            sameDayForgotSession = prevRecord;
+          }
         }
-        const prevConfig = resolveReviewConfig(prevRecord.algorithm, prevRecord.interaction);
-        prevRecord.algorithm = prevConfig.algorithm;
-        prevRecord.interaction = prevConfig.interaction;
-        rawRecord.baseSessionData = prevRecord;
+      } else {
+        if (!prevDaySession) {
+          const prevRecord: Record<string, any> = {
+            refUid: uid,
+            dateCreated: prevDate,
+          };
+          if (prevChild.children) {
+            parseFieldValuesFromChildren(prevRecord, prevChild.children);
+          }
+          const prevConfig = resolveReviewConfig(prevRecord.algorithm, prevRecord.interaction);
+          prevRecord.algorithm = prevConfig.algorithm;
+          prevRecord.interaction = prevConfig.interaction;
+          prevDaySession = prevRecord;
+        }
         break;
       }
+    }
+
+    if (rawRecord.sm2_grade !== 0 && sameDayForgotSession) {
+      rawRecord.baseSessionData = sameDayForgotSession;
+    } else if (prevDaySession) {
+      rawRecord.baseSessionData = prevDaySession;
     }
   }
 

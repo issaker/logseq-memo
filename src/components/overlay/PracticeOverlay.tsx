@@ -37,6 +37,7 @@ import {
   isLBLReviewMode,
   isSessionMastered,
   getSessionAlgorithm,
+  resolveBaseForCalculation,
   SchedulingAlgorithm,
   FixedTimeUnit,
   InteractionStyle,
@@ -114,11 +115,7 @@ interface Props {
   onRestartCallback: () => void;
 }
 
-const PracticeOverlay = ({
-  isOpen,
-  onCloseCallback,
-  onRestartCallback,
-}: Props) => {
+const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) => {
   const sessionContext = usePracticeSession();
   const {
     settings,
@@ -154,18 +151,6 @@ const PracticeOverlay = ({
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [sessionOverrides, setSessionOverrides] = React.useState<Record<string, Session>>({});
 
-  const baseSessionDataMap = React.useRef<Record<string, Session>>({});
-
-  React.useEffect(() => {
-    const map: Record<string, Session> = {};
-    for (const [uid, session] of Object.entries(practiceData)) {
-      if ((session as Session).baseSessionData) {
-        map[uid] = (session as Session).baseSessionData!;
-      }
-    }
-    baseSessionDataMap.current = map;
-  }, [practiceData]);
-
   const isFirst = currentIndex === 0;
 
   const currentCardRefUid = cardQueue[currentIndex] as string | undefined;
@@ -175,19 +160,23 @@ const PracticeOverlay = ({
     const effectiveSession = sessionOverride || currentSession;
     return effectiveSession ? [effectiveSession] : [];
   }, [currentCardRefUid, practiceData, sessionOverrides]);
-  const { currentCardData, cardMeta, algorithm, interaction, latestSession, applyOptimisticCardMeta } =
-    useCurrentCardData({
-      currentCardRefUid,
-      sessions,
-    });
+  const {
+    currentCardData,
+    cardMeta,
+    algorithm,
+    interaction,
+    latestSession,
+    applyOptimisticCardMeta,
+  } = useCurrentCardData({
+    currentCardRefUid,
+    sessions,
+  });
 
   const totalCardsCount = (todaySelectedTag?.new || 0) + (todaySelectedTag?.due || 0);
   const hasCards = totalCardsCount > 0;
 
   const [fixed_multiplier, setFixed_multiplier] = React.useState<number>(
-    isFixedTimeAlgorithm(algorithm)
-      ? (currentCardData?.fixed_multiplier || 3)
-      : 3
+    isFixedTimeAlgorithm(algorithm) ? currentCardData?.fixed_multiplier || 3 : 3
   );
   const [fixed_unit, setFixed_unit] = React.useState<FixedTimeUnit>(
     currentCardData?.fixed_unit || FixedTimeUnit.DAYS
@@ -195,14 +184,13 @@ const PracticeOverlay = ({
 
   const isDone = todaySelectedTag?.status === CompletionStatus.Finished || !currentCardData;
 
-  const baseCardData = React.useMemo(() => {
-    if (!currentCardRefUid) return currentCardData;
-    const isForgotReReview = currentCardData?.sm2_grade === 0;
-    if (baseSessionDataMap.current[currentCardRefUid] && !isForgotReReview) {
-      return { ...generateNewSession(), ...baseSessionDataMap.current[currentCardRefUid] };
-    }
-    return practiceData[currentCardRefUid] || currentCardData;
-  }, [currentCardRefUid, practiceData, currentCardData]);
+  // Resolve the base session for SM2/Progressive/FixedTime calculation.
+  // On same-day re-scoring, rewinds to baseSessionData (Forgot or previous day)
+  // to prevent interval inflation. See resolveBaseForCalculation in session.ts.
+  const baseCardData = React.useMemo(
+    () => (currentCardData ? resolveBaseForCalculation(currentCardData) : currentCardData),
+    [currentCardData]
+  );
 
   // Track previous card UID so the interval state is only initialised
   // when the card changes — not on every polling update that touches
@@ -281,7 +269,9 @@ const PracticeOverlay = ({
 
   const [childSessionData, setChildSessionData] = React.useState<Record<string, Session>>({});
   const [isChildSessionLoading, setIsChildSessionLoading] = React.useState(false);
-  const [loadedChildSessionScopeKey, setLoadedChildSessionScopeKey] = React.useState<string | null>(null);
+  const [loadedChildSessionScopeKey, setLoadedChildSessionScopeKey] = React.useState<string | null>(
+    null
+  );
   const childSessionDataRef = React.useRef<Record<string, Session>>({});
   React.useEffect(() => {
     childSessionDataRef.current = childSessionData;
@@ -300,28 +290,40 @@ const PracticeOverlay = ({
     setChildSessionData({});
     setIsChildSessionLoading(true);
     setLoadedChildSessionScopeKey(null);
-    getChildSessionData({ childUids: childUidsList, dataPageTitle }).then((data) => {
-      if (!cancelled) {
-        const mergedChildSessions = {
-          ...(data as Record<string, Session>),
-          ...childUidsList.reduce((acc, uid) => {
-            if (sessionOverrides[uid]) {
-              acc[uid] = sessionOverrides[uid];
-            }
-            return acc;
-          }, {} as Record<string, Session>),
-        };
-        setChildSessionData(mergedChildSessions);
-        setIsChildSessionLoading(false);
-        setLoadedChildSessionScopeKey(childSessionScopeKey);
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        setIsChildSessionLoading(false);
-      }
-    });
-    return () => { cancelled = true; };
-  }, [isLineByLineActive, childUidsList, dataPageTitle, currentCardRefUid, currentIndex, sessionOverrides, childSessionScopeKey]);
+    getChildSessionData({ childUids: childUidsList, dataPageTitle })
+      .then((data) => {
+        if (!cancelled) {
+          const mergedChildSessions = {
+            ...(data as Record<string, Session>),
+            ...childUidsList.reduce((acc, uid) => {
+              if (sessionOverrides[uid]) {
+                acc[uid] = sessionOverrides[uid];
+              }
+              return acc;
+            }, {} as Record<string, Session>),
+          };
+          setChildSessionData(mergedChildSessions);
+          setIsChildSessionLoading(false);
+          setLoadedChildSessionScopeKey(childSessionScopeKey);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsChildSessionLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isLineByLineActive,
+    childUidsList,
+    dataPageTitle,
+    currentCardRefUid,
+    currentIndex,
+    sessionOverrides,
+    childSessionScopeKey,
+  ]);
 
   const {
     lineByLineRevealedCount,
@@ -362,26 +364,31 @@ const PracticeOverlay = ({
     childUidsList,
   });
 
+  // LBL mode: resolve base from child session; Normal mode: use parent's baseCardData.
+  // Algorithm is overridden to the child's actual algorithm (may differ from parent).
   const effectiveBaseCardData = React.useMemo(() => {
     if (!isLineByLineActive) return baseCardData;
     const currentChildUid = childUidsList[lineByLineCurrentChildIndex];
     if (!currentChildUid) return baseCardData;
     const childSession = childSessionData[currentChildUid];
     if (childSession) {
-      const now = new Date();
-      const isSameDayReScoring = !!childSession.dateCreated
-        && dateUtils.isSameDay(childSession.dateCreated, now)
-        && childSession.sm2_grade !== 0;
-      const baseData = (isSameDayReScoring && childSession.baseSessionData)
-        ? childSession.baseSessionData
-        : childSession;
-      return { ...baseData, algorithm: getSessionAlgorithm(childSession, algorithm) };
+      const resolvedBase = resolveBaseForCalculation(childSession);
+      return { ...resolvedBase, algorithm: getSessionAlgorithm(childSession, algorithm) };
     }
     return generateNewSession({ algorithm });
-  }, [isLineByLineActive, baseCardData, childUidsList, lineByLineCurrentChildIndex, childSessionData, algorithm]);
+  }, [
+    isLineByLineActive,
+    baseCardData,
+    childUidsList,
+    lineByLineCurrentChildIndex,
+    childSessionData,
+    algorithm,
+  ]);
 
   React.useEffect(() => {
-    const effectiveInteraction = (latestSession?.interaction || interaction) as InteractionStyle | undefined;
+    const effectiveInteraction = (latestSession?.interaction || interaction) as
+      | InteractionStyle
+      | undefined;
     const effectiveIsLBL = isLBLReviewMode(effectiveInteraction) && hasBlockChildrenUids;
 
     if (effectiveIsLBL) {
@@ -409,7 +416,22 @@ const PracticeOverlay = ({
     } else {
       setShowAnswers(true);
     }
-  }, [hasBlockChildren, hasCloze, hasBlockChildrenUids, algorithm, interaction, currentCardRefUid, latestSession, currentChildIsLblNext, lineByLineCurrentChildIndex, childSessionData, childUidsList, lineByLineIsCardComplete, childHasBlockChildren, childHasCloze]);
+  }, [
+    hasBlockChildren,
+    hasCloze,
+    hasBlockChildrenUids,
+    algorithm,
+    interaction,
+    currentCardRefUid,
+    latestSession,
+    currentChildIsLblNext,
+    lineByLineCurrentChildIndex,
+    childSessionData,
+    childUidsList,
+    lineByLineIsCardComplete,
+    childHasBlockChildren,
+    childHasCloze,
+  ]);
 
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
@@ -457,11 +479,14 @@ const PracticeOverlay = ({
 
       if (isLineByLineActive && !lineByLineIsCardComplete) {
         const currentChildUid = childUidsList[lineByLineCurrentChildIndex];
-        const childSession = currentChildUid ? childSessionDataRef.current[currentChildUid] : undefined;
-        const isChildReScoring = !!childSession
-          && childSession.dateCreated
-          && dateUtils.isSameDay(childSession.dateCreated, new Date())
-          && childSession.sm2_grade !== 0;
+        const childSession = currentChildUid
+          ? childSessionDataRef.current[currentChildUid]
+          : undefined;
+        const isChildReScoring =
+          !!childSession &&
+          childSession.dateCreated &&
+          dateUtils.isSameDay(childSession.dateCreated, new Date()) &&
+          childSession.sm2_grade !== 0;
         if (isChildReScoring) {
           setShowOverwriteReminder(true);
         }
@@ -485,10 +510,11 @@ const PracticeOverlay = ({
       };
 
       const isNewCard = currentCardRefUid && (practiceData[currentCardRefUid] as NewSession)?.isNew;
-      const isReScoring = !isNewCard
-        && currentCardData?.dateCreated
-        && dateUtils.isSameDay(currentCardData.dateCreated, new Date())
-        && currentCardData.sm2_grade !== 0;
+      const isReScoring =
+        !isNewCard &&
+        currentCardData?.dateCreated &&
+        dateUtils.isSameDay(currentCardData.dateCreated, new Date()) &&
+        currentCardData.sm2_grade !== 0;
       if (isReScoring) {
         setShowOverwriteReminder(true);
       }
@@ -568,13 +594,20 @@ const PracticeOverlay = ({
     updateSetting('showBreadcrumbs', !showBreadcrumbs);
   }, [showBreadcrumbs, updateSetting]);
 
-  const handleApplyAndClose = React.useCallback((formSettings: import('~/components/SettingsForm').SettingsFormSettings) => {
-    (Object.keys(formSettings) as (keyof import('~/components/SettingsForm').SettingsFormSettings)[]).forEach((key) => {
-      updateSetting(key, formSettings[key]);
-    });
-    setShowSettings(false);
-    onRestartCallback();
-  }, [updateSetting, onRestartCallback]);
+  const handleApplyAndClose = React.useCallback(
+    (formSettings: import('~/components/SettingsForm').SettingsFormSettings) => {
+      (
+        Object.keys(
+          formSettings
+        ) as (keyof import('~/components/SettingsForm').SettingsFormSettings)[]
+      ).forEach((key) => {
+        updateSetting(key, formSettings[key]);
+      });
+      setShowSettings(false);
+      onRestartCallback();
+    },
+    [updateSetting, onRestartCallback]
+  );
 
   const hotkeys = React.useMemo(
     () => [
@@ -641,35 +674,36 @@ const PracticeOverlay = ({
         if (!currentChildUid) return;
 
         try {
-        const existingChildSession = childSessionData[currentChildUid] || generateNewSession({ algorithm: newAlgorithm });
+          const existingChildSession =
+            childSessionData[currentChildUid] || generateNewSession({ algorithm: newAlgorithm });
 
-        setChildSessionData((prev) => ({
-          ...prev,
-          [currentChildUid]: {
-            ...existingChildSession,
+          setChildSessionData((prev) => ({
+            ...prev,
+            [currentChildUid]: {
+              ...existingChildSession,
+              algorithm: newAlgorithm,
+            },
+          }));
+
+          setSessionOverrides((prev) => ({
+            ...prev,
+            [currentChildUid]: {
+              ...existingChildSession,
+              algorithm: newAlgorithm,
+            },
+          }));
+
+          applyOptimisticCardMeta({
+            ...cardMeta,
             algorithm: newAlgorithm,
-          },
-        }));
+            interaction: interaction,
+          });
 
-        setSessionOverrides((prev) => ({
-          ...prev,
-          [currentChildUid]: {
-            ...existingChildSession,
+          await updateReviewConfig({
+            refUid: currentChildUid,
+            dataPageTitle,
             algorithm: newAlgorithm,
-          },
-        }));
-
-        applyOptimisticCardMeta({
-          ...cardMeta,
-          algorithm: newAlgorithm,
-          interaction: interaction,
-        });
-
-        await updateReviewConfig({
-          refUid: currentChildUid,
-          dataPageTitle,
-          algorithm: newAlgorithm,
-        });
+          });
         } catch (err) {
           console.error('Memo: Failed to update algorithm', err);
         }
@@ -680,27 +714,27 @@ const PracticeOverlay = ({
       if (!interaction) throw new Error('interaction is undefined in onSelectAlgorithm');
 
       try {
-      setSessionOverrides((prev) => ({
-        ...prev,
-        [currentCardRefUid]: {
-          ...currentCardData,
+        setSessionOverrides((prev) => ({
+          ...prev,
+          [currentCardRefUid]: {
+            ...currentCardData,
+            algorithm: newAlgorithm,
+            interaction: interaction,
+          },
+        }));
+
+        applyOptimisticCardMeta({
+          ...cardMeta,
           algorithm: newAlgorithm,
           interaction: interaction,
-        },
-      }));
+        });
 
-      applyOptimisticCardMeta({
-        ...cardMeta,
-        algorithm: newAlgorithm,
-        interaction: interaction,
-      });
-
-      await updateReviewConfig({
-        refUid: currentCardRefUid,
-        dataPageTitle,
-        algorithm: newAlgorithm,
-        interaction: interaction,
-      });
+        await updateReviewConfig({
+          refUid: currentCardRefUid,
+          dataPageTitle,
+          algorithm: newAlgorithm,
+          interaction: interaction,
+        });
       } catch (err) {
         console.error('Memo: Failed to update algorithm', err);
       }
@@ -728,27 +762,27 @@ const PracticeOverlay = ({
       if (!algorithm) throw new Error('algorithm is undefined in onSelectInteraction');
 
       try {
-      setSessionOverrides((prev) => ({
-        ...prev,
-        [currentCardRefUid]: {
-          ...currentCardData,
+        setSessionOverrides((prev) => ({
+          ...prev,
+          [currentCardRefUid]: {
+            ...currentCardData,
+            algorithm: algorithm,
+            interaction: newInteraction,
+          },
+        }));
+
+        applyOptimisticCardMeta({
+          ...cardMeta,
           algorithm: algorithm,
           interaction: newInteraction,
-        },
-      }));
+        });
 
-      applyOptimisticCardMeta({
-        ...cardMeta,
-        algorithm: algorithm,
-        interaction: newInteraction,
-      });
-
-      await updateReviewConfig({
-        refUid: currentCardRefUid,
-        dataPageTitle,
-        algorithm: algorithm,
-        interaction: newInteraction,
-      });
+        await updateReviewConfig({
+          refUid: currentCardRefUid,
+          dataPageTitle,
+          algorithm: algorithm,
+          interaction: newInteraction,
+        });
       } catch (err) {
         console.error('Memo: Failed to update interaction', err);
       }
@@ -764,158 +798,181 @@ const PracticeOverlay = ({
   );
 
   // useMemo: stable reference to prevent unnecessary re-renders in PracticeSessionContext consumers
-  const sessionContextValue = React.useMemo(() => ({
-    ...sessionContext,
-    algorithm,
-    interaction,
-    onSelectAlgorithm,
-    onSelectInteraction,
-  }), [sessionContext, algorithm, interaction, onSelectAlgorithm, onSelectInteraction]);
+  const sessionContextValue = React.useMemo(
+    () => ({
+      ...sessionContext,
+      algorithm,
+      interaction,
+      onSelectAlgorithm,
+      onSelectInteraction,
+    }),
+    [sessionContext, algorithm, interaction, onSelectAlgorithm, onSelectInteraction]
+  );
 
   // useMemo: stable reference to prevent unnecessary re-renders in MainContext consumers
-  const mainContextValue = React.useMemo(() => ({
-    fixed_multiplier,
-    setFixed_multiplier,
-    fixed_unit,
-    setFixed_unit,
-    onPracticeClick,
-    currentIndex,
-    renderMode,
-    isLineByLine: isLineByLineActive,
-    lineByLineCurrentIndex: isLineByLineActive ? lineByLineCurrentChildIndex + 1 : 0,
-    lineByLineTotal: isLineByLineActive ? childUidsList.length : 0,
-    lineByLineDueCount: isLineByLineActive ? dueChildCount : 0,
-    cardQueueLength: cardQueue.length,
-    cardMeta,
-    baseCardData: effectiveBaseCardData,
-    currentChildAlgorithm: isLineByLineActive ? currentChildAlgorithm : undefined,
-    lineByLineIsCardComplete: isLineByLineActive ? lineByLineIsCardComplete : false,
-    onLineByLinePrev: isLineByLineActive ? onLineByLinePrev : undefined,
-    onLineByLineNext: isLineByLineActive ? onLineByLineNext : undefined,
-  }), [fixed_multiplier, setFixed_multiplier, fixed_unit, setFixed_unit, onPracticeClick, currentIndex, renderMode, isLineByLineActive, lineByLineCurrentChildIndex, childUidsList, dueChildCount, cardQueue.length, cardMeta, effectiveBaseCardData, currentChildAlgorithm, lineByLineIsCardComplete, onLineByLinePrev, onLineByLineNext]);
+  const mainContextValue = React.useMemo(
+    () => ({
+      fixed_multiplier,
+      setFixed_multiplier,
+      fixed_unit,
+      setFixed_unit,
+      onPracticeClick,
+      currentIndex,
+      renderMode,
+      isLineByLine: isLineByLineActive,
+      lineByLineCurrentIndex: isLineByLineActive ? lineByLineCurrentChildIndex + 1 : 0,
+      lineByLineTotal: isLineByLineActive ? childUidsList.length : 0,
+      lineByLineDueCount: isLineByLineActive ? dueChildCount : 0,
+      cardQueueLength: cardQueue.length,
+      cardMeta,
+      baseCardData: effectiveBaseCardData,
+      currentChildAlgorithm: isLineByLineActive ? currentChildAlgorithm : undefined,
+      lineByLineIsCardComplete: isLineByLineActive ? lineByLineIsCardComplete : false,
+      onLineByLinePrev: isLineByLineActive ? onLineByLinePrev : undefined,
+      onLineByLineNext: isLineByLineActive ? onLineByLineNext : undefined,
+    }),
+    [
+      fixed_multiplier,
+      setFixed_multiplier,
+      fixed_unit,
+      setFixed_unit,
+      onPracticeClick,
+      currentIndex,
+      renderMode,
+      isLineByLineActive,
+      lineByLineCurrentChildIndex,
+      childUidsList,
+      dueChildCount,
+      cardQueue.length,
+      cardMeta,
+      effectiveBaseCardData,
+      currentChildAlgorithm,
+      lineByLineIsCardComplete,
+      onLineByLinePrev,
+      onLineByLineNext,
+    ]
+  );
 
   if (!todaySelectedTag) {
     return null;
   }
 
   return (
-    <PracticeSessionContext.Provider
-      value={sessionContextValue}
-    >
-    <MainContext.Provider
-      value={mainContextValue}
-    >
-      <style>{MOBILE_OVERLAY_STYLES}</style>
-      <Dialog
-        $isEditing={isEditing}
-        $algorithm={algorithm}
-        $showModeBorders={showModeBorders}
-        isOpen={isOpen}
-        onClose={onCloseCallback}
-        className="pb-0"
-        canEscapeKeyClose={true}
-      >
-        <Header
-          className="bp3-dialog-header outline-none focus:outline-none focus-visible:outline-none"
-          onCloseCallback={onCloseCallback}
-          onTagChange={onTagChange}
-          status={status}
-          isDone={isDone}
-          nextDueDate={nextDueDate}
-          onToggleBreadcrumbs={toggleBreadcrumbs}
-          onSettingsClick={() => setShowSettings(true)}
-        />
-
-        <DialogBody
-          className="bp3-dialog-body overflow-y-scroll m-0 pt-6 pb-8 px-4"
-          dir={rtlEnabled ? 'rtl' : undefined}
+    <PracticeSessionContext.Provider value={sessionContextValue}>
+      <MainContext.Provider value={mainContextValue}>
+        <style>{MOBILE_OVERLAY_STYLES}</style>
+        <Dialog
+          $isEditing={isEditing}
+          $algorithm={algorithm}
+          $showModeBorders={showModeBorders}
+          isOpen={isOpen}
+          onClose={onCloseCallback}
+          className="pb-0"
+          canEscapeKeyClose={true}
         >
-          {currentCardRefUid ? (
-            <>
-              {isLineByLineActive ? (
-                <LineByLineView
-                  currentCardRefUid={currentCardRefUid}
-                  childUidsList={childUidsList}
-                  lineByLineRevealedCount={lineByLineRevealedCount}
-                  lineByLineCurrentChildIndex={lineByLineCurrentChildIndex}
-                  childSessionData={childSessionData}
-                  setHasCloze={setHasCloze}
-                  showBreadcrumbs={showBreadcrumbs}
-                  autoCollapseBlocks={autoCollapseBlocks}
-                  showAnswers={showAnswers}
-                  currentChildAlgorithm={currentChildAlgorithm}
-                  setChildHasBlockChildren={setChildHasBlockChildren}
-                  setChildHasCloze={setChildHasCloze}
-                />
-              ) : shouldShowAnswerFirst ? (
-                blockInfo.childrenUids?.map((uid) => (
+          <Header
+            className="bp3-dialog-header outline-none focus:outline-none focus-visible:outline-none"
+            onCloseCallback={onCloseCallback}
+            onTagChange={onTagChange}
+            status={status}
+            isDone={isDone}
+            nextDueDate={nextDueDate}
+            onToggleBreadcrumbs={toggleBreadcrumbs}
+            onSettingsClick={() => setShowSettings(true)}
+          />
+
+          <DialogBody
+            className="bp3-dialog-body overflow-y-scroll m-0 pt-6 pb-8 px-4"
+            dir={rtlEnabled ? 'rtl' : undefined}
+          >
+            {currentCardRefUid ? (
+              <>
+                {isLineByLineActive ? (
+                  <LineByLineView
+                    currentCardRefUid={currentCardRefUid}
+                    childUidsList={childUidsList}
+                    lineByLineRevealedCount={lineByLineRevealedCount}
+                    lineByLineCurrentChildIndex={lineByLineCurrentChildIndex}
+                    childSessionData={childSessionData}
+                    setHasCloze={setHasCloze}
+                    showBreadcrumbs={showBreadcrumbs}
+                    autoCollapseBlocks={autoCollapseBlocks}
+                    showAnswers={showAnswers}
+                    currentChildAlgorithm={currentChildAlgorithm}
+                    setChildHasBlockChildren={setChildHasBlockChildren}
+                    setChildHasCloze={setChildHasCloze}
+                  />
+                ) : shouldShowAnswerFirst ? (
+                  blockInfo.childrenUids?.map((uid) => (
+                    <CardBlock
+                      key={uid}
+                      refUid={uid}
+                      showAnswers={showAnswers}
+                      setHasCloze={setHasCloze}
+                      breadcrumbs={blockInfo.breadcrumbs}
+                      showBreadcrumbs={false}
+                      onRenderComplete={NOOP}
+                    />
+                  ))
+                ) : (
                   <CardBlock
-                    key={uid}
-                    refUid={uid}
+                    refUid={currentCardRefUid}
                     showAnswers={showAnswers}
                     setHasCloze={setHasCloze}
                     breadcrumbs={blockInfo.breadcrumbs}
-                    showBreadcrumbs={false}
+                    showBreadcrumbs={showBreadcrumbs}
                     onRenderComplete={NOOP}
                   />
-                ))
-              ) : (
-                <CardBlock
-                  refUid={currentCardRefUid}
-                  showAnswers={showAnswers}
-                  setHasCloze={setHasCloze}
-                  breadcrumbs={blockInfo.breadcrumbs}
-                  showBreadcrumbs={showBreadcrumbs}
-                  onRenderComplete={NOOP}
-                />
-              )}
-            </>
-          ) : (
-            <div data-testid="practice-overlay-done-state" className="flex items-center flex-col">
-              <DoneIllustration />
-              <div>
-                You&apos;re all caught up! 🌟{' '}
-                {todaySelectedTag.completed > 0
-                  ? `Reviewed ${todaySelectedTag.completed} ${stringUtils.pluralize(
-                      todaySelectedTag.completed,
-                      'card',
-                      'cards'
-                    )} today.`
-                  : ''}
+                )}
+              </>
+            ) : (
+              <div data-testid="practice-overlay-done-state" className="flex items-center flex-col">
+                <DoneIllustration />
+                <div>
+                  You&apos;re all caught up! 🌟{' '}
+                  {todaySelectedTag.completed > 0
+                    ? `Reviewed ${todaySelectedTag.completed} ${stringUtils.pluralize(
+                        todaySelectedTag.completed,
+                        'card',
+                        'cards'
+                      )} today.`
+                    : ''}
+                </div>
               </div>
-            </div>
+            )}
+          </DialogBody>
+          {showOverwriteReminder && (
+            <OverwriteReminder>今日已学习，此次学习将覆盖今日数据</OverwriteReminder>
           )}
-        </DialogBody>
-        {showOverwriteReminder && (
-          <OverwriteReminder>今日已学习，此次学习将覆盖今日数据</OverwriteReminder>
-        )}
-        {/* LBL showAnswers unified: internal showAnswers state controls both CardBlock and Footer.
+          {/* LBL showAnswers unified: internal showAnswers state controls both CardBlock and Footer.
             lineByLineRevealedCount only controls LineByLineView row rendering range. */}
-        <Footer
-          refUid={currentCardRefUid}
-          onPracticeClick={onPracticeClick}
-          onSkipClick={onSkipClick}
-          onPrevClick={onPrevClick}
-          setShowAnswers={
-            isLineByLineActive && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers
-          }
-          showAnswers={showAnswers}
-          isDone={isDone}
-          hasCards={hasCards}
-          onCloseCallback={onCloseCallback}
-          currentCardData={currentCardData}
-          onStartCrammingClick={onStartCrammingClick}
-        />
-      </Dialog>
+          <Footer
+            refUid={currentCardRefUid}
+            onPracticeClick={onPracticeClick}
+            onSkipClick={onSkipClick}
+            onPrevClick={onPrevClick}
+            setShowAnswers={
+              isLineByLineActive && !lineByLineIsCardComplete
+                ? onLineByLineShowAnswer
+                : setShowAnswers
+            }
+            showAnswers={showAnswers}
+            isDone={isDone}
+            hasCards={hasCards}
+            onCloseCallback={onCloseCallback}
+            currentCardData={currentCardData}
+            onStartCrammingClick={onStartCrammingClick}
+          />
+        </Dialog>
 
-      <SettingsDialog
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        settings={settings}
-        onApplyAndClose={handleApplyAndClose}
-        dataPageTitle={dataPageTitle}
-      />
-    </MainContext.Provider>
+        <SettingsDialog
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+          settings={settings}
+          onApplyAndClose={handleApplyAndClose}
+          dataPageTitle={dataPageTitle}
+        />
+      </MainContext.Provider>
     </PracticeSessionContext.Provider>
   );
 };
@@ -930,12 +987,9 @@ const Dialog = styled(Blueprint.Dialog)<{
   max-height: 80vh;
   width: 90vw;
 
-  border: 2px solid
-    ${({ $algorithm }) => getAlgorithmColor($algorithm)};
+  border: 2px solid ${({ $algorithm }) => getAlgorithmColor($algorithm)};
   border-color: ${({ $showModeBorders, $algorithm }) =>
-    $showModeBorders === false
-      ? colors.borderSubtle
-      : getAlgorithmColor($algorithm)};
+    $showModeBorders === false ? colors.borderSubtle : getAlgorithmColor($algorithm)};
 
   ${mediaQueries.lg} {
     width: 80vw;
@@ -1031,8 +1085,15 @@ const DoneIllustrationHalo = styled.div`
   animation: memoDonePulse 2.2s ease-in-out infinite;
 
   @keyframes memoDonePulse {
-    0%, 100% { transform: scale(0.92); opacity: 0.5; }
-    50% { transform: scale(1.04); opacity: 1; }
+    0%,
+    100% {
+      transform: scale(0.92);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scale(1.04);
+      opacity: 1;
+    }
   }
 `;
 
@@ -1066,8 +1127,15 @@ const DoneIllustrationSpark = styled.div<{
   animation: memoDoneFloat 2.6s ease-in-out infinite;
 
   @keyframes memoDoneFloat {
-    0%, 100% { transform: translateY(0); opacity: 0.65; }
-    50% { transform: translateY(-6px); opacity: 1; }
+    0%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.65;
+    }
+    50% {
+      transform: translateY(-6px);
+      opacity: 1;
+    }
   }
 `;
 
@@ -1086,10 +1154,18 @@ const OverwriteReminder = styled.div`
   pointer-events: none;
 
   @keyframes fadeInOut {
-    0% { opacity: 0; }
-    15% { opacity: 1; }
-    75% { opacity: 1; }
-    100% { opacity: 0; }
+    0% {
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    75% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
   }
 `;
 

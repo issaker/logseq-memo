@@ -209,7 +209,8 @@ roam/memo (page)
 │   │   │   ├── progressive_interval:: 6
 │   │   │   ├── fixed_multiplier:: 3
 │   │   │   └── fixed_unit:: days
-│   │   └── [[April 13th, 2026]] 🔴    ← Older session
+│   │   ├── [[April 14th, 2026]] 🔴    ← Same-day Forgot session (preserved for SM2)
+│   │   └── [[April 13th, 2026]] 🔵    ← Older session
 │   └── ...
 ├── cache (heading block)
 └── settings (heading block)
@@ -217,6 +218,7 @@ roam/memo (page)
 
 **Key principles**:
 - The latest session block is the single source of truth
+- Same-day Forgot sessions are preserved (not overwritten) so the SM2 algorithm can account for the Forgot in subsequent calculations
 - Field naming follows `{owner}_{purpose}` convention: `sm2_*`, `progressive_*`, `fixed_*`
 - Each algorithm only modifies its OWN fields; other fields are inherited unchanged → switching algorithms never loses data
 - LBL child blocks have independent sessions; parent cards only aggregate child due state
@@ -230,7 +232,7 @@ At runtime the system is intentionally split into four layers:
 1. `src/practice.ts`
    Pure scheduling math for SM2 / Progressive / Fixed Time.
 2. `src/models/session.ts`
-   Shared learning semantics: due/mastered checks, child due detection, parent due aggregation.
+   Shared learning semantics: due/mastered checks, child due detection, parent due aggregation, and `resolveBaseForCalculation` (unified same-day re-scoring logic).
 3. `src/models/practice.ts`
    Queue strategies: primary queue urgency sorting and LBL sequential scanning.
 4. UI + queries
@@ -276,7 +278,10 @@ Because the system's purpose is card learning, not mode-specific behavior. The l
 Old names (`repetitions`, `interval`, `eFactor`) were ambiguous — they didn't indicate which algorithm owned them. New names (`sm2_repetitions`, `progressive_interval`) make field ownership explicit, reducing cross-algorithm pollution bugs.
 
 ### Why update same-day session blocks instead of creating new ones?
-Previously, reinserted cards graded again on the same day produced duplicate `[[Date]]` blocks, causing data bloat. The new behavior updates the existing same-day session block in-place — each card has at most one session block per day.
+Previously, reinserted cards graded again on the same day produced duplicate `[[Date]]` blocks, causing data bloat. The new behavior updates the existing same-day session block in-place — each card has at most one session block per day, **except** when the existing session is a Forgot (grade=0) and the new grade is non-Forgot. In that case, a new session block is created to preserve the Forgot history, ensuring the SM2 algorithm accounts for the memory lapse in subsequent calculations.
+
+### Why resolveBaseForCalculation?
+Same-day re-scoring requires "rewinding" to the pre-re-score state to prevent interval inflation (e.g., Good→Perfect stacking intervals). Previously, this logic was scattered across 5 locations with subtly different conditions. `resolveBaseForCalculation` unifies this into 3 clear rules: (1) non-same-day → use as-is, (2) same-day Forgot → use as-is (Forgot is the new baseline), (3) same-day non-Forgot → use `baseSessionData` (rewind to Forgot or previous day). This eliminates the `baseSessionDataMap` → `baseCardData` → `effectiveBaseCardData` three-layer chain and reduces code by ~60 lines.
 
 ### ⚠️ Build Pitfall: Do NOT remove `library.export: 'default'`
 Roam loads plugins via `<script>` tag. The UMD wrapper needs proper default export handling. Removing this causes `Uncaught SyntaxError: Unexpected token 'export'` and silent plugin failure.

@@ -10,13 +10,13 @@ import {
   Session,
   isGradingAlgorithm,
   getSessionAlgorithm,
+  resolveBaseForCalculation,
   deriveParentNextDueDateFromChildSessions,
 } from '~/models/session';
 import { getLblQueueState } from '~/models/practice';
 import { savePracticeData, updateParentNextDueDate } from '~/queries';
 import { generatePracticeData } from '~/practice';
 import { generateNewSession } from '~/queries/utils';
-import * as dateUtils from '~/utils/date';
 
 export const shouldReinsertLblCard = ({
   currentChildIndex,
@@ -84,7 +84,11 @@ export default function useLineByLineReview({
   const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);
 
   const currentChildAlgorithm = React.useMemo(() => {
-    if (!isLBLReviewMode || !childUidsList.length || lineByLineCurrentChildIndex >= childUidsList.length) {
+    if (
+      !isLBLReviewMode ||
+      !childUidsList.length ||
+      lineByLineCurrentChildIndex >= childUidsList.length
+    ) {
       return algorithm;
     }
     const childUid = childUidsList[lineByLineCurrentChildIndex];
@@ -123,32 +127,38 @@ export default function useLineByLineReview({
     const firstDueIndex = lblQueueState.nextDueChildIndex;
     setLineByLineCurrentChildIndex(firstDueIndex);
     setLineByLineRevealedCount(firstDueIndex + 1);
-  }, [isLBLReviewMode, childUidsList, childSessionData, hasLoadedChildSessionsForCurrentCard, lblQueueState]);
+  }, [
+    isLBLReviewMode,
+    childUidsList,
+    childSessionData,
+    hasLoadedChildSessionsForCurrentCard,
+    lblQueueState,
+  ]);
 
   const lineByLineIsCardComplete =
     isLBLReviewMode && lineByLineCurrentChildIndex >= childUidsList.length;
 
+  // Unified grading path for both LBL-Next (Progressive/FixedTime) and SM2 child blocks.
+  // The only difference is sm2_grade: undefined for LBL-Next, the actual grade for SM2.
+  // resolveBaseForCalculation handles same-day re-scoring rewind uniformly.
   const onLineByLineGrade = React.useCallback(
     async (grade: number) => {
       if (!currentCardRefUid || lineByLineCurrentChildIndex >= childUidsList.length) return;
 
       try {
-      const childUid = childUidsList[lineByLineCurrentChildIndex];
-      const existingChildSession = childSessionData[childUid] || generateNewSession({ algorithm: currentChildAlgorithm });
-      const now = new Date();
+        const childUid = childUidsList[lineByLineCurrentChildIndex];
+        const existingChildSession =
+          childSessionData[childUid] || generateNewSession({ algorithm: currentChildAlgorithm });
+        const now = new Date();
 
-      const isSameDayReScoring = !!existingChildSession.dateCreated
-        && dateUtils.isSameDay(existingChildSession.dateCreated, now);
-
-      if (currentChildIsLblNext) {
-        const baseForCalculation = (isSameDayReScoring && existingChildSession.baseSessionData)
-          ? existingChildSession.baseSessionData
-          : existingChildSession;
+        const baseForCalculation = resolveBaseForCalculation(existingChildSession, now);
+        const sm2_grade = currentChildIsLblNext ? undefined : grade;
         const childPracticeProps = {
           ...baseForCalculation,
           refUid: childUid,
           dataPageTitle,
           algorithm: currentChildAlgorithm,
+          ...(sm2_grade !== undefined && { sm2_grade }),
         };
         const childResult = generatePracticeData({ ...childPracticeProps, dateCreated: now });
         const childNextDueDate = childResult.nextDueDate;
@@ -166,18 +176,21 @@ export default function useLineByLineReview({
           dataPageTitle,
         });
 
+        const updatedChildSession = { ...existingChildSession, ...childResult, dateCreated: now };
+
         setChildSessionData((prev) => ({
           ...prev,
-          [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
+          [childUid]: updatedChildSession,
         }));
+
+        const updatedChildSessionsForParent = {
+          ...childSessionData,
+          [childUid]: { ...updatedChildSession, nextDueDate: childNextDueDate },
+        };
 
         setSessionOverrides((prev) => ({
           ...prev,
-          [childUid]: {
-            ...existingChildSession,
-            ...childResult,
-            dateCreated: now,
-          },
+          [childUid]: updatedChildSession,
           [currentCardRefUid]: {
             ...currentCardData,
             algorithm: currentChildAlgorithm,
@@ -185,27 +198,37 @@ export default function useLineByLineReview({
             dateCreated: now,
             nextDueDate: deriveParentNextDueDateFromChildSessions(
               childUidsList,
-              {
-                ...childSessionData,
-                [childUid]: { ...existingChildSession, ...childResult, nextDueDate: childNextDueDate },
-              },
+              updatedChildSessionsForParent,
               now
             ),
           },
         }));
 
+        if (grade === 0 && forgotReinsertOffset > 0 && currentCardRefUid) {
+          const forgotInsertIndex = currentIndex + 1 + forgotReinsertOffset;
+          setCardQueue((prev) => {
+            const newQueue = [...prev];
+            const targetIndex = Math.min(forgotInsertIndex, newQueue.length);
+            newQueue.splice(targetIndex, 0, currentCardRefUid);
+            return newQueue;
+          });
+        }
+
+        if (grade === 0) {
+          setCurrentIndex((prev) => prev + 1);
+          setShowAnswers(false);
+          return;
+        }
+
         const nextDueIndex = getLblQueueState(
           childUidsList,
-          {
-            ...childSessionData,
-            [childUid]: { ...existingChildSession, ...childResult, nextDueDate: childNextDueDate },
-          },
+          updatedChildSessionsForParent,
           lineByLineCurrentChildIndex + 1
         ).nextDueChildIndex;
-
         const isCardComplete = nextDueIndex >= childUidsList.length;
 
         if (
+          currentChildIsLblNext &&
           shouldReinsertLblCard({
             currentChildIndex: lineByLineCurrentChildIndex,
             totalChildren: childUidsList.length,
@@ -227,102 +250,7 @@ export default function useLineByLineReview({
 
         setLineByLineCurrentChildIndex(nextDueIndex);
         setLineByLineRevealedCount(isCardComplete ? nextDueIndex : nextDueIndex + 1);
-        return;
-      }
-
-      const baseForCalculation = (isSameDayReScoring && grade !== 0 && existingChildSession.baseSessionData)
-        ? existingChildSession.baseSessionData
-        : existingChildSession;
-      const childPracticeProps = {
-        ...baseForCalculation,
-        refUid: childUid,
-        dataPageTitle,
-        algorithm: currentChildAlgorithm,
-        sm2_grade: grade,
-      };
-      const childResult = generatePracticeData({ ...childPracticeProps, dateCreated: now });
-      const childNextDueDate = childResult.nextDueDate;
-
-      await savePracticeData({
-        refUid: childUid,
-        dataPageTitle,
-        dateCreated: now,
-        ...childResult,
-      });
-
-      await updateParentNextDueDate({
-        refUid: currentCardRefUid,
-        childUids: childUidsList,
-        dataPageTitle,
-      });
-
-      setChildSessionData((prev) => ({
-        ...prev,
-        [childUid]: { ...existingChildSession, ...childResult, dateCreated: now },
-      }));
-
-      setSessionOverrides((prev) => ({
-        ...prev,
-        [childUid]: {
-          ...existingChildSession,
-          ...childResult,
-          dateCreated: now,
-        },
-        [currentCardRefUid]: {
-          ...currentCardData,
-          algorithm: currentChildAlgorithm,
-          interaction,
-          dateCreated: now,
-          nextDueDate: deriveParentNextDueDateFromChildSessions(
-            childUidsList,
-            {
-              ...childSessionData,
-              [childUid]: { ...existingChildSession, ...childResult, nextDueDate: childNextDueDate },
-            },
-            now
-          ),
-        },
-      }));
-
-      if (grade === 0 && forgotReinsertOffset > 0 && currentCardRefUid) {
-        const forgotInsertIndex = currentIndex + 1 + forgotReinsertOffset;
-        setCardQueue((prev) => {
-          const newQueue = [...prev];
-          const targetIndex = Math.min(forgotInsertIndex, newQueue.length);
-          newQueue.splice(targetIndex, 0, currentCardRefUid);
-          return newQueue;
-        });
-      }
-
-      if (grade === 0) {
-        setCurrentIndex((prev) => prev + 1);
         setShowAnswers(false);
-        return;
-      }
-
-      const updatedChildSessions = {
-        ...childSessionData,
-        [childUid]: { ...existingChildSession, ...childResult, nextDueDate: childNextDueDate },
-      };
-      const nextQueueState = getLblQueueState(
-        childUidsList,
-        updatedChildSessions,
-        lineByLineCurrentChildIndex + 1
-      );
-      const nextDueIndex = nextQueueState.nextDueChildIndex;
-      const isCardFinished = nextQueueState.isComplete;
-
-      if (isCardFinished) {
-        setCurrentIndex((prev) => prev + 1);
-        setLineByLineCurrentChildIndex(nextDueIndex);
-        setLineByLineRevealedCount(nextDueIndex);
-        setShowAnswers(false);
-        return;
-      }
-
-      setLineByLineCurrentChildIndex(nextDueIndex);
-      setLineByLineRevealedCount(nextDueIndex + 1);
-      setShowAnswers(false);
       } catch (err) {
         console.error('Memo: Failed to grade LBL card', err);
       }

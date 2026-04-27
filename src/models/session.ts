@@ -19,7 +19,10 @@
  *   - progressive_repetitions, progressive_interval: Progressive-specific parameters.
  *   - fixed_multiplier:   FixedTime user-configured interval value.
  *   - fixed_unit:         FixedTime user-configured time unit (days/weeks/months/years).
- *   - baseSessionData:   Previous-day session snapshot for same-day Forgot re-review scenarios.
+ *   - baseSessionData:   Previous-day session snapshot for same-day re-scoring scenarios.
+ *                        When a same-day Forgot session exists before the latest non-Forgot
+ *                        session, baseSessionData points to the Forgot session instead,
+ *                        ensuring the SM2 algorithm accounts for the Forgot in calculations.
  *
  *   Three algorithms:
  *   - SM2:        Memory card — adaptive intervals based on grading (green border)
@@ -63,7 +66,11 @@ export interface CardMeta {
   nextDueDate?: Date;
 }
 
-export interface NewSession extends Omit<Session, 'nextDueDate' | 'sm2_grade' | 'sm2_interval' | 'progressive_interval' | 'baseSessionData'> {
+export interface NewSession
+  extends Omit<
+    Session,
+    'nextDueDate' | 'sm2_grade' | 'sm2_interval' | 'progressive_interval' | 'baseSessionData'
+  > {
   isNew: boolean;
 }
 
@@ -211,13 +218,53 @@ export const deriveParentNextDueDateFromChildSessions = (
   return earliestFutureDueDate || now;
 };
 
-export const getAlgorithmIntent = (algorithm: SchedulingAlgorithm | undefined): 'success' | 'warning' | 'primary' | 'none' => {
+export const getAlgorithmIntent = (
+  algorithm: SchedulingAlgorithm | undefined
+): 'success' | 'warning' | 'primary' | 'none' => {
   switch (algorithm) {
-    case SchedulingAlgorithm.SM2: return 'success';
-    case SchedulingAlgorithm.PROGRESSIVE: return 'warning';
-    case SchedulingAlgorithm.FIXED_TIME: return 'primary';
-    default: return 'none';
+    case SchedulingAlgorithm.SM2:
+      return 'success';
+    case SchedulingAlgorithm.PROGRESSIVE:
+      return 'warning';
+    case SchedulingAlgorithm.FIXED_TIME:
+      return 'primary';
+    default:
+      return 'none';
   }
+};
+
+/**
+ * Resolve the base session data for SM2/Progressive/FixedTime calculation.
+ *
+ * When a card is re-scored on the same day, the scheduling algorithm must use
+ * the "pre-re-score" state as input, not the already-overwritten same-day state.
+ * This prevents interval inflation (e.g., Good→Perfect on same day stacking intervals).
+ *
+ * Three rules (replacing 5 scattered same-day checks across the codebase):
+ *   1. Non-same-day session → use as-is (normal review, no re-score)
+ *   2. Same-day Forgot (grade=0) → use as-is (Forgot is the new baseline)
+ *   3. Same-day non-Forgot → use baseSessionData (rewind to Forgot or previous day)
+ *
+ * baseSessionData is populated by parseLatestSession():
+ *   - If a same-day Forgot session exists before the latest non-Forgot session,
+ *     baseSessionData points to the Forgot session (preserving the reset effect).
+ *   - Otherwise, baseSessionData points to the most recent non-same-day session.
+ */
+export const resolveBaseForCalculation = (
+  currentSession: Session,
+  now: Date = new Date()
+): Session => {
+  const isSameDay =
+    !!currentSession.dateCreated &&
+    now.getFullYear() === currentSession.dateCreated.getFullYear() &&
+    now.getMonth() === currentSession.dateCreated.getMonth() &&
+    now.getDate() === currentSession.dateCreated.getDate();
+  const isForgot = currentSession.sm2_grade === 0;
+
+  if (!isSameDay) return currentSession;
+  if (isForgot) return currentSession;
+  if (currentSession.baseSessionData) return currentSession.baseSessionData;
+  return currentSession;
 };
 
 /**
@@ -228,7 +275,11 @@ export const resolveReviewConfig = (
   rawAlgorithm?: string,
   rawInteraction?: string
 ): ReviewConfig => {
-  const algorithm = Object.values(SchedulingAlgorithm).find(a => a === rawAlgorithm) || DEFAULT_REVIEW_CONFIG.algorithm;
-  const interaction = Object.values(InteractionStyle).find(i => i === rawInteraction) || DEFAULT_REVIEW_CONFIG.interaction;
+  const algorithm =
+    Object.values(SchedulingAlgorithm).find((a) => a === rawAlgorithm) ||
+    DEFAULT_REVIEW_CONFIG.algorithm;
+  const interaction =
+    Object.values(InteractionStyle).find((i) => i === rawInteraction) ||
+    DEFAULT_REVIEW_CONFIG.interaction;
   return { algorithm, interaction };
 };
