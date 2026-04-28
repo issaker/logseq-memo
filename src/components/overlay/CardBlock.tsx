@@ -42,9 +42,7 @@ const renderRoamBlock = async ({
       await asyncUtils.sleep(100);
       domUtils.simulateMouseClick(expandControlBtn);
     } else if (!autoExpandRef.current && !isCollapsed) {
-      await window.roamAlphaAPI.updateBlock({
-        block: { uid, open: false },
-      });
+      domUtils.collapseBlockOnPage(uid);
     }
 
     // Disconnect any existing observer
@@ -122,9 +120,6 @@ const CardBlock = ({
     autoExpandRef.current = autoExpand;
   }, [autoExpand]);
 
-  // Create a ref to store the debounced function
-  const debouncedFnRef = React.useRef<(() => void) | null>(null);
-
   const handleBlockBlur = React.useCallback(() => {
     // In the practice dialog, blur-based re-rendering destroys the DOM
     // and breaks Roam's focus management (arrow navigation, text selection).
@@ -160,8 +155,10 @@ const CardBlock = ({
 
   // ── Debounced re-render for blur-based forceUpdate ──
   // Textarea blur events can fire rapidly when the user is editing; the
-  // debounce coalesces these into a single re-render.  Not used for refUid
-  // changes (which are handled by the immediate effect above).
+  // debounce coalesces these into a single re-render.  Does NOT include
+  // refUid in deps — card changes are handled by the immediate effect above.
+  // Including refUid here would cause a second render 100ms after every card
+  // transition (double the DOM work: unmount, re-mount, re-observer).
   React.useEffect(() => {
     if (!ref.current || !refUid) return;
 
@@ -183,6 +180,10 @@ const CardBlock = ({
     debouncedReRender();
 
     return () => {
+      // Cancel any pending debounced re-render so it doesn't fire after
+      // this effect re-runs (stale closure would render wrong uid).
+      debouncedReRender.cancel();
+
       registeredTextareasRef.current.forEach((textarea) => {
         textarea.removeEventListener('blur', handleBlockBlur);
       });
@@ -193,7 +194,7 @@ const CardBlock = ({
         observerRef.current = null;
       }
     };
-  }, [forceUpdate, autoExpand, refUid, handleBlockBlur, onRenderComplete]);
+  }, [forceUpdate, autoExpand, handleBlockBlur, onRenderComplete]);
 
   return (
     <div>

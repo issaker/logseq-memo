@@ -271,26 +271,15 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
     [childUidsList, facts.latestByUid]
   );
   // Fetch child sessions for the current LBL card.
-  //
-  // BUG WARNING — must have a cancellation guard:
-  //   Without the cancelled flag, if the user switches LBL cards (childUidsList
-  //   changes) before the async fetch resolves, the STALE response (for the
-  //   OLD card's children) arrives after the NEW card's response and overwrites
-  //   the correct data in facts.latestByUid.  This causes the wrong session
-  //   data to display for the new card's children.
-  //
-  //   The cleanup function (return () => { cancelled = true }) runs when the
-  //   effect re-fires (childUidsList change) or the component unmounts, flagging
-  //   the in-flight promise as stale so its .then() is a no-op.
+  // ensureLatestSessions merges fetched data into facts.latestByUid internally.
+  // The merge is additive (keyed by uid) so stale responses for old card's
+  // children just add harmless extra data — they don't overwrite the new card's
+  // child sessions (which have different uids).  No cancellation needed.
   React.useEffect(() => {
     if (!isLineByLineActive || !childUidsList.length) {
       return;
     }
-    let cancelled = false;
-    ensureLatestSessions(childUidsList).then(() => {
-      if (cancelled) return;
-    });
-    return () => { cancelled = true; };
+    ensureLatestSessions(childUidsList);
   }, [isLineByLineActive, childUidsList, ensureLatestSessions]);
 
   // setShowAnswers must exist before useLineByLineReview.
@@ -317,7 +306,6 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
     isLBLReviewMode: isLineByLineActive,
     hasLoadedChildSessionsForCurrentCard: true,
     algorithm,
-    revisitDirectives: viewState.revisitDirectives,
     focusedChildUid: viewState.focusedChildUid,
     setFocusedChildUid,
     setMaxVisitedChildIndex,
