@@ -32,6 +32,7 @@
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
 import {
+  Records,
   SchedulingAlgorithm,
   InteractionStyle,
   isGradingAlgorithm,
@@ -45,7 +46,7 @@ import {
   getOrCreateChildBlock,
   getOrCreatePage,
 } from '~/queries/utils';
-import { SESSION_SNAPSHOT_KEYS, getChildSessionData } from '~/queries/data';
+import { SESSION_SNAPSHOT_KEYS, getChildSessionData, undoLatestSession } from '~/queries/data';
 
 const NUMERIC_SESSION_KEYS = [
   'sm2_grade',
@@ -391,4 +392,48 @@ export const deduplicateSessionFields = async ({
   }
 
   return { cleaned, errors };
+};
+
+/**
+ * Undo a card's latest review session — pure data operation, no queue interaction.
+ *
+ * This is a CARD operation, not a queue operation.  Per the architecture:
+ *   "Card is the atom.  A card is a Roam block + its session.  It does not
+ *    know which queue it sits in."
+ *
+ * Only touches Roam data blocks.  The caller is responsible for updating
+ * in-memory facts via the returned Records.
+ *
+ * @returns Fresh session data for the affected card(s), keyed by uid.
+ *          Caller should merge this into facts.latestByUid.
+ */
+export const undoCardSession = async ({
+  targetUid,
+  parentUid,
+  childUidsList,
+  dataPageTitle,
+}: {
+  targetUid: string;
+  parentUid?: string;
+  childUidsList?: string[];
+  dataPageTitle: string;
+}): Promise<Records> => {
+  // Deletes the latest session block from Roam, rolling back to the
+  // previous session (or making the card "new" if no sessions remain).
+  await undoLatestSession({ refUid: targetUid, dataPageTitle });
+
+  // For LBL children: recalculate the parent's nextDueDate based on
+  // the rolled-back child session (child is now due again).
+  if (parentUid && childUidsList?.length) {
+    await updateParentNextDueDate({
+      refUid: parentUid,
+      childUids: childUidsList,
+      dataPageTitle,
+    });
+  }
+
+  // Reload the affected card(s) from Roam so the caller can update facts.
+  const reloadUids: string[] = [targetUid];
+  if (parentUid) reloadUids.push(parentUid);
+  return await getChildSessionData({ childUids: reloadUids, dataPageTitle });
 };

@@ -13,7 +13,6 @@ import {
   savePracticeData,
   updateParentNextDueDate,
   updateReviewConfig,
-  undoLatestSession,
 } from '~/queries';
 import { generateNewSession } from '~/queries/utils';
 import { generatePracticeData } from '~/practice';
@@ -574,67 +573,6 @@ export const useReviewRuntime = ({
     ]
   );
 
-  // ── undo ──
-  const undoLatestReview = React.useCallback(
-    async (args: {
-      targetUid: RecordUid;
-      parentUid?: RecordUid;
-      isChild: boolean;
-      childUidsList?: string[];
-      fetchPracticeData: () => void;
-      setShowAnswers: (show: boolean) => void;
-    }) => {
-      const { targetUid, parentUid, isChild, childUidsList, setShowAnswers } = args;
-
-      try {
-        setPendingState(targetUid, 'undoing');
-        await undoLatestSession({ refUid: targetUid, dataPageTitle });
-
-        if (isChild && parentUid && childUidsList?.length) {
-          await updateParentNextDueDate({
-            refUid: parentUid,
-            childUids: childUidsList,
-            dataPageTitle,
-          });
-        }
-      } catch (err) {
-        console.error('Memo: Failed to undo today session', err);
-      } finally {
-        clearPendingState(targetUid);
-      }
-
-      // BUG WARNING — do NOT call removeRevisitDirectives or fetchPracticeData here:
-      //
-      //   removeRevisitDirectives  deletes entries from primaryQueue.  If the undone
-      //   card was in the queue via a revisit directive (e.g. a previous Forgot or
-      //   LBL-Next reinsert), removing the directive shifts every subsequent entry
-      //   left by 1.  currentIndex is NOT adjusted, so it now points to the WRONG
-      //   card (the one that slid into the removed entry's position).
-      //
-      //   fetchPracticeData reloads today from Roam, recomputes initialUids, and
-      //   triggers the initialUidsKey effect.  Even with the sorted-set guard, the
-      //   queue composition can change subtly, causing the LBL parent to shift or
-      //   disappear from its position.
-      //
-      //   Fix: instead of touching the queue, update facts directly so the undone
-      //   card's session data reflects the rollback.  The queue and currentIndex
-      //   stay exactly where they are.
-      const reloadUids: RecordUid[] = [targetUid];
-      if (isChild && parentUid) reloadUids.push(parentUid);
-      try {
-        const freshData = await getChildSessionData({ childUids: reloadUids, dataPageTitle });
-        if (Object.keys(freshData).length) {
-          upsertLatestSessions(freshData);
-        }
-      } catch (err) {
-        console.error('Memo: Failed to refresh facts after undo', err);
-      }
-
-      setShowAnswers(false);
-    },
-    [dataPageTitle, setPendingState, clearPendingState, upsertLatestSessions]
-  );
-
   // ── review config update ──
   const updateReviewConfigAction = React.useCallback(
     async (args: {
@@ -742,7 +680,6 @@ export const useReviewRuntime = ({
     ensureLatestSessions,
     deriveChildSessionMap,
     reviewUnit,
-    undoLatestReview,
     updateReviewConfigAction,
   };
 };

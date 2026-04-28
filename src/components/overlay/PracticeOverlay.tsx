@@ -12,10 +12,9 @@
  * - CardBlock renders the actual Roam block content
  *
  * Runtime architecture:
- * - All learning-related writes go through unified runtime actions:
- *   reviewUnit, undoLatestReview, updateReviewConfigAction
+ * - reviewUnit and updateReviewConfigAction go through unified runtime actions
+ * - Undo is a CARD operation (undoCardSession in queries/save.ts), not a queue operation
  * - This component is a container that wires runtime actions to UI callbacks
- * - Do not reintroduce inline review/undo/config logic here
  *
  * Settings flow:
  * - All settings come from useSettings via App props (single source of truth)
@@ -57,6 +56,7 @@ import useBlockInfo from '~/hooks/useBlockInfo';
 import useCurrentCardData from '~/hooks/useCurrentCardData';
 import useCardBlock from '~/hooks/useCardBlock';
 import { generateNewSession } from '~/queries';
+import { undoCardSession } from '~/queries/save';
 
 import { CompletionStatus, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
@@ -140,7 +140,6 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
     isCramming,
     setIsCramming,
     handleMemoTagChange,
-    fetchPracticeData,
     dataPageTitle,
     updateSetting,
   } = sessionContext;
@@ -177,7 +176,7 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
     setMaxVisitedChildIndex,
     ensureLatestSessions,
     reviewUnit,
-    undoLatestReview,
+    upsertLatestSessions,
     updateReviewConfigAction,
   } = runtime;
 
@@ -453,6 +452,11 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
     resetChildViewState();
   };
 
+  // Undo is a CARD operation, not a queue operation.
+  // Per architecture: "Card is the atom. It does not know which queue
+  // it sits in."  undoCardSession only touches Roam data blocks.
+  // upsertLatestSessions then syncs the rolled-back session into facts.
+  // Queue and currentIndex are never touched.
   const onUndoLearning = React.useCallback(async () => {
     if (!currentCardRefUid) return;
     const undoRefUid =
@@ -461,19 +465,21 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
         : currentCardRefUid;
     if (!undoRefUid) return;
 
-    await undoLatestReview({
+    const freshData = await undoCardSession({
       targetUid: undoRefUid,
       parentUid: isLineByLineActive && !lineByLineIsCardComplete ? currentCardRefUid : undefined,
-      isChild: isLineByLineActive && !lineByLineIsCardComplete,
       childUidsList: isLineByLineActive ? childUidsList : undefined,
-      fetchPracticeData,
-      setShowAnswers,
+      dataPageTitle,
     });
+    if (Object.keys(freshData).length) {
+      upsertLatestSessions(freshData);
+    }
+    setShowAnswers(false);
   }, [
-    currentCardRefUid, fetchPracticeData,
+    currentCardRefUid,
     isLineByLineActive, lineByLineIsCardComplete,
     childUidsList, lineByLineCurrentChildIndex,
-    undoLatestReview, setShowAnswers,
+    dataPageTitle, upsertLatestSessions, setShowAnswers,
   ]);
 
   const toggleBreadcrumbs = React.useCallback(() => {
