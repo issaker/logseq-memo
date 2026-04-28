@@ -37,8 +37,9 @@ interface UseLineByLineReviewInput {
   childUidsList: string[];
   isLBLReviewMode: boolean;
   hasLoadedChildSessionsForCurrentCard: boolean;
+  /** @deprecated no longer used — kept for interface compatibility */
+  revisitDirectives?: RevisitDirective[];
   algorithm: SchedulingAlgorithm;
-  revisitDirectives: RevisitDirective[];
   focusedChildUid?: string;
   setFocusedChildUid: (_uid?: string) => void;
   setMaxVisitedChildIndex: (_index: number) => void;
@@ -85,7 +86,7 @@ export default function useLineByLineReview({
   isLBLReviewMode,
   hasLoadedChildSessionsForCurrentCard,
   algorithm,
-  revisitDirectives: _revisitDirectives,
+  /** @deprecated */ revisitDirectives: _revisitDirectives,
   focusedChildUid,
   setFocusedChildUid,
   setMaxVisitedChildIndex,

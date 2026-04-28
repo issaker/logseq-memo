@@ -57,14 +57,30 @@ const useCardBlock = (
     return true;
   }, [algorithm, hasBlockChildren, hasCloze]);
 
-  // Per-card override ("Show Answer" click).  Reset on card change.
-  const [showAnswersOverride, setShowAnswersOverride] = React.useState(false);
-  React.useEffect(() => { setShowAnswersOverride(false); }, [refUid]);
+  // Per-card showAnswers override ("Show Answer" click), keyed by refUid.
+  //
+  // BUG WARNING — DO NOT USE a single useState + useEffect reset:
+  //   A single state (showAnswersOverride) persists across card changes.
+  //   Using useEffect(() => setShowAnswersOverride(false), [refUid]) would
+  //   reset it AFTER the first render of the new card, not BEFORE.  The
+  //   old card's override would briefly apply to the new card, causing a
+  //   one-frame flash where SM2 answers expand before hiding, or where a
+  //   Progressive card briefly shows an SM2 answer-state.
+  //
+  // Fix: key the override by refUid so each card starts with a clean slate
+  // synchronously.  No effect-based reset needed.
+  const [overrideMap, setOverrideMap] = React.useState<Record<string, boolean>>({});
 
   const setShowAnswers = React.useCallback((show: boolean) => {
-    setShowAnswersOverride(show);
-  }, []);
+    if (!refUid) return;
+    setOverrideMap((prev) => {
+      // Return same reference when unchanged → no extra render
+      if (prev[refUid] === show) return prev;
+      return { ...prev, [refUid]: show };
+    });
+  }, [refUid]);
 
+  const showAnswersOverride = refUid ? (overrideMap[refUid] ?? false) : false;
   const showAnswers = showAnswersOverride || defaultShowAnswers;
 
   return {

@@ -527,20 +527,27 @@ export const useReviewRuntime = ({
       }
 
       // ── 4. Persist to Roam ──
+      // savePracticeData and updateParentNextDueDate are independent —
+      // run them in parallel to reduce latency on each review.
       try {
-        await savePracticeData({
-          refUid: targetUid,
-          dataPageTitle,
-          dateCreated: now,
-          ...practiceResult,
-        });
-        if (isChild) {
-          await updateParentNextDueDate({
-            refUid: parentUid!,
-            childUids: childUidsList!,
+        const persists: Promise<void>[] = [
+          savePracticeData({
+            refUid: targetUid,
             dataPageTitle,
-          });
+            dateCreated: now,
+            ...practiceResult,
+          }),
+        ];
+        if (isChild) {
+          persists.push(
+            updateParentNextDueDate({
+              refUid: parentUid!,
+              childUids: childUidsList!,
+              dataPageTitle,
+            })
+          );
         }
+        await Promise.all(persists);
       } catch (err) {
         console.error('Memo: Failed to save practice data', err);
       } finally {

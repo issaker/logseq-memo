@@ -76,9 +76,7 @@ const LineByLineView = ({
               showAnswers={
                 isCurrentGrading
                   ? showAnswers         // current SM2 child: controlled by user
-                  : isMastered
-                    ? true              // already reviewed: always show
-                    : showAnswers       // not yet reviewed: follow current state
+                  : isMastered || showAnswers // reviewed: always show; else follow state
               }
               setHasCloze={isCurrentLine ? setChildHasCloze : NOOP}
               breadcrumbs={[]}

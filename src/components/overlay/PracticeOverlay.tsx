@@ -271,11 +271,18 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
     () => deriveChildSessionMap({ childUidsList, facts: facts.latestByUid }),
     [childUidsList, facts.latestByUid]
   );
+  // Fetch child sessions for the current LBL card.
+  // cancelled guard prevents stale responses from overwriting newer data
+  // when the user switches cards before the async fetch completes.
   React.useEffect(() => {
     if (!isLineByLineActive || !childUidsList.length) {
       return;
     }
-    void ensureLatestSessions(childUidsList);
+    let cancelled = false;
+    ensureLatestSessions(childUidsList).then(() => {
+      if (cancelled) return;
+    });
+    return () => { cancelled = true; };
   }, [isLineByLineActive, childUidsList, ensureLatestSessions]);
 
   // setShowAnswers must exist before useLineByLineReview.
