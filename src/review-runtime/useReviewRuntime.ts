@@ -24,20 +24,34 @@ import {
 /**
  * useReviewRuntime — single entry point for all review state.
  *
+ * ═══════════════════════════════════════════════════════════════════════
+ * ARCHITECTURE INVARIANT — READ BEFORE MODIFYING:
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ *   Cards are NEVER removed from the primaryQueue after grading.
+ *
+ *   The queue is built ONCE at session start from today's dueUids + newUids.
+ *   Forgot and LBL-Next reinserts add DUPLICATE entries at later positions,
+ *   but they never REMOVE the original entry.  Navigation is purely
+ *   index-based: after each review, currentIndex++.
+ *
+ *   DO NOT derive the queue from deriveDeckSnapshot or latestByUid on
+ *   every mutation.  That was the cause of the "queue jumps to 0/51" bug:
+ *   when a card was mastered, deriveDeckSnapshot excluded it from
+ *   availablePrimaryQueue, focusNextAfterMutation couldn't find its entry,
+ *   and fell back to queue[0].
+ *
+ *   If you're tempted to "re-derive the queue to keep it in sync":
+ *   DON'T.  The queue is intentionally static.  Cards that have been
+ *   reviewed stay in the queue so the user can navigate back to them.
+ *   The only modifications are insertions (Forgot / LBL-Next), not removals.
+ *
+ * ═══════════════════════════════════════════════════════════════════════
+ *
  * Architecture:
  *   1. SessionFacts (facts.latestByUid) — one session per uid
  *   2. ViewState — currentIndex into the static primary queue + navigation state
  *   3. primaryQueue — STATIC array generated once at session start
- *
- * Key design invariant: cards are NEVER removed from the queue after grading.
- * The queue is built once from today's dueUids + newUids.  The only
- * modifications are Forgot and LBL-Next reinserts, which insert a DUPLICATE
- * entry at a later position so the card reappears later in the same session.
- * Navigation is purely index-based (currentIndex++ after each review).
- *
- * This eliminates the entire class of bugs where mastered cards were silently
- * removed from the queue during deriveDeckSnapshot, causing navigation to
- * jump to queue[0] or other wrong positions.
  */
 import {
   deriveChildSessionMap,
@@ -466,30 +480,31 @@ export const useReviewRuntime = ({
       // ── 3. Handle reinsert directives (Forgot / LBL-Next) ──
       const isForgot = grade === 0;
 
+      // Advance the primary queue index.  Extracted to a single helper so
+      // all three branches (normal, LBL-Forgot, LBL-Next/complete) stay in
+      // sync — duplicating setViewState inline caused bugs in the past when
+      // one branch was updated but others were not.
+      const advancePrimaryQueue = () => {
+        setViewState((prev) => ({
+          ...prev,
+          previousPrimaryUid: currentCardRefUid,
+          currentIndex: prev.currentIndex + 1,
+        }));
+      };
+
       if (!isChild) {
         // Normal card: Forgot with offset → reinsert this card later
         if (isForgot && forgotReinsertOffset > 0) {
           addRevisitDirective(targetUid, forgotReinsertOffset, 'forgot');
         }
-        // Advance queue index
-        setViewState((prev) => ({
-          ...prev,
-          previousPrimaryUid: currentCardRefUid,
-          currentIndex: prev.currentIndex + 1,
-          revisitDirectives: prev.revisitDirectives, // already updated by addRevisitDirective
-        }));
+        advancePrimaryQueue();
         setShowAnswers(false);
       } else if (isForgot) {
         // LBL child Forgot: reinsert PARENT card later, advance queue
         if (forgotReinsertOffset > 0) {
           addRevisitDirective(parentUid!, forgotReinsertOffset, 'forgot');
         }
-        setViewState((prev) => ({
-          ...prev,
-          previousPrimaryUid: currentCardRefUid,
-          currentIndex: prev.currentIndex + 1,
-          revisitDirectives: prev.revisitDirectives, // already updated by addRevisitDirective
-        }));
+        advancePrimaryQueue();
         setShowAnswers(false);
       } else {
         // LBL child non-Forgot: advance within children or complete card.
@@ -508,18 +523,9 @@ export const useReviewRuntime = ({
         ) {
           // LBL-Next: reinsert parent card later, advance queue
           addRevisitDirective(parentUid!, lblNextReinsertOffset!, 'lbl-next');
-          setViewState((prev) => ({
-            ...prev,
-            previousPrimaryUid: currentCardRefUid,
-            currentIndex: prev.currentIndex + 1,
-            revisitDirectives: prev.revisitDirectives, // already updated by addRevisitDirective
-          }));
+          advancePrimaryQueue();
         } else if (isCardComplete) {
-          setViewState((prev) => ({
-            ...prev,
-            previousPrimaryUid: currentCardRefUid,
-            currentIndex: prev.currentIndex + 1,
-          }));
+          advancePrimaryQueue();
         } else {
           // Stay on this parent card, advance within children
           // No primary queue navigation
@@ -590,6 +596,12 @@ export const useReviewRuntime = ({
         algorithm,
         interaction,
         childSessionData,
+        // ARCHITECTURE NOTE — applyOptimisticCardMeta and cardMeta are
+        // technically redundant: upsertLatestSession already updates
+        // facts.latestByUid, which is the single source of truth for
+        // cardMeta (via useCurrentCardData's derivedCardMeta).  Keeping
+        // them because removing would require verifying all call sites,
+        // but future cleanup should derive cardMeta purely from facts.
         applyOptimisticCardMeta,
         cardMeta,
       } = args;

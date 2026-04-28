@@ -31,8 +31,18 @@ export default function useCurrentCardData({
   // Direct alias — not state.  Always reflects the freshest session data.
   const currentCardData = latestSession;
 
-  // Optimistic meta keyed by card uid so the synchronous uid guard below
-  // ignores stale overrides from the previous card on the same render.
+  // ARCHITECTURE NOTE — optimisticCardMeta is technically mirrored state.
+  // It duplicates cardMeta for the purpose of optimistic UI during config
+  // changes.  The single source of truth is facts.latestByUid, and
+  // derivedCardMeta already picks up changes from upsertLatestSession.
+  // This overlay exists because of historical reasons (when currentCardData
+  // was a useState, not a direct alias).  If removing, verify that:
+  //   1. updateReviewConfigAction in useReviewRuntime still updates facts
+  //      before any async operation (it does via upsertLatestSession)
+  //   2. The uid guard prevents the previous card's stale meta from
+  //      leaking into the next card's first render
+  // Keyed by card uid so the synchronous uid guard below ignores stale
+  // overrides from the previous card on the same render.
   const [optimisticCardMeta, setOptimisticCardMeta] = React.useState<{
     meta: CardMeta;
     uid: string;
