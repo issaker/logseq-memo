@@ -36,11 +36,10 @@ module.exports = [
       filename: 'extension.js',
       path: __dirname,
       library: {
-        type: 'module',
+        name: 'RoamMemo',
+        type: 'umd',
+        export: 'default',
       },
-    },
-    experiments: {
-      outputModule: true,
     },
   },
   {
