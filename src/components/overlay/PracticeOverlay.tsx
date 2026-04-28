@@ -272,8 +272,17 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
     [childUidsList, facts.latestByUid]
   );
   // Fetch child sessions for the current LBL card.
-  // cancelled guard prevents stale responses from overwriting newer data
-  // when the user switches cards before the async fetch completes.
+  //
+  // BUG WARNING — must have a cancellation guard:
+  //   Without the cancelled flag, if the user switches LBL cards (childUidsList
+  //   changes) before the async fetch resolves, the STALE response (for the
+  //   OLD card's children) arrives after the NEW card's response and overwrites
+  //   the correct data in facts.latestByUid.  This causes the wrong session
+  //   data to display for the new card's children.
+  //
+  //   The cleanup function (return () => { cancelled = true }) runs when the
+  //   effect re-fires (childUidsList change) or the component unmounts, flagging
+  //   the in-flight promise as stale so its .then() is a no-op.
   React.useEffect(() => {
     if (!isLineByLineActive || !childUidsList.length) {
       return;
