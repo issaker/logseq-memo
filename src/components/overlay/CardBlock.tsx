@@ -194,6 +194,7 @@ const CardBlock = ({
         observerRef.current = null;
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forceUpdate, autoExpand, handleBlockBlur, onRenderComplete]);
 
   return (

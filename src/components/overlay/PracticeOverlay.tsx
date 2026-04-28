@@ -38,7 +38,6 @@ import {
   Session,
   DEFAULT_REVIEW_CONFIG,
   isFixedTimeAlgorithm,
-  isGradingAlgorithm,
   isLBLReviewMode,
   isSessionMastered,
   getReviewStatus,
@@ -168,7 +167,6 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
     currentCardRefUid,
     currentIndex,
     cardQueueLength,
-    isFirst,
     focusPrimaryByOffset,
     setFocusedPrimaryUid,
     setFocusedChildUid,
@@ -255,7 +253,6 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
   // Parent card structural data (childrenUids, breadcrumbs) — always
   // the X-axis entry.  Separate from activeCard below.
   const { blockInfo } = useBlockInfo({ refUid: currentCardRefUid, refreshKey: interaction });
-  const hasBlockChildren = !!blockInfo.children && !!blockInfo.children.length;
   const hasBlockChildrenUids = !!blockInfo.childrenUids && !!blockInfo.childrenUids.length;
 
 
@@ -299,7 +296,6 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
     onLineByLineShowAnswer,
     onLineByLinePrev,
     onLineByLineNext,
-    currentChildIsLblNext,
   } = useLineByLineReview({
     currentCardRefUid,
     childUidsList,
@@ -368,7 +364,7 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
       return { ...resolvedBase, algorithm: getSessionAlgorithm(childSession, DEFAULT_REVIEW_CONFIG.algorithm) };
     }
     return generateNewSession({ algorithm });
-  }, [isLineByLineActive, baseCardData, childUidsList, lineByLineCurrentChildIndex, childSessionData, algorithm]);
+  }, [isLineByLineActive, baseCardData, currentChildUid, childSessionData, algorithm]);
 
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !activeCard.showAnswers;
@@ -583,7 +579,7 @@ const PracticeOverlay = ({ isOpen, onCloseCallback, onRestartCallback }: Props) 
       currentCardRefUid, cardMeta, applyOptimisticCardMeta, interaction,
       isLineByLineActive, lineByLineIsCardComplete,
       childUidsList, lineByLineCurrentChildIndex, childSessionData,
-      updateReviewConfigAction,
+      updateReviewConfigAction, setShowAnswers,
     ]
   );
 

@@ -249,10 +249,6 @@ export const useReviewRuntime = ({
     }));
   }, []);
 
-  const setCurrentIndex = React.useCallback((index: number) => {
-    setViewState((prev) => ({ ...prev, currentIndex: index }));
-  }, []);
-
   // ── revisit directive helpers ──
   const createRevisitDirective = React.useCallback(
     (uid: RecordUid, offset: number, reason: 'forgot' | 'lbl-next'): RevisitDirective => {

@@ -41,7 +41,6 @@ import {
 } from '~/models/session';
 import {
   createChildBlock,
-  getChildBlock,
   getOrCreateBlockOnPage,
   getOrCreateChildBlock,
   getOrCreatePage,
