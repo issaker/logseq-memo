@@ -120,10 +120,15 @@ export const useReviewRuntime = ({
     );
   }, [initialUids, viewState.revisitDirectives]);
 
-  // Reset index + directives when the base queue ACTUALLY changes
-  // (new session, tag switch).  Use a stable key to avoid reacting to
-  // spurious reference changes from fetchPracticeData().
-  const initialUidsKey = React.useMemo(() => initialUids.join(','), [initialUids]);
+  // Reset index + directives when the base queue COMPOSITION changes
+  // (different set of cards, e.g. tag switch or new session).
+  // Key is based on SORTED UIDs so that ORDER changes (from
+  // sortNormalDueCardUids after undo or review) don't trigger a reset —
+  // order changes are handled by the primaryQueue useMemo automatically.
+  const initialUidsKey = React.useMemo(
+    () => Array.from(new Set(initialUids)).sort().join(','),
+    [initialUids]
+  );
   React.useEffect(() => {
     setViewState({
       currentIndex: 0,

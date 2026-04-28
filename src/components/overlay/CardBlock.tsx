@@ -7,6 +7,81 @@ import { Icon } from '@blueprintjs/core';
 import useCloze from '~/hooks/useCloze';
 import { colors } from '~/theme';
 
+// Extract render logic into a standalone function so it can be called
+// both immediately (on card change) and debounced (on blur re-render).
+// See inline call sites below for why this matters.
+const renderRoamBlock = async ({
+  containerEl,
+  uid,
+  autoExpandRef,
+  onRenderComplete,
+  handleBlockBlur,
+  setRenderedBlockElm,
+  observerRef,
+  registeredTextareasRef,
+}: {
+  containerEl: HTMLElement;
+  uid: string;
+  autoExpandRef: React.MutableRefObject<boolean>;
+  onRenderComplete?: () => void;
+  handleBlockBlur: () => void;
+  setRenderedBlockElm: (el: HTMLElement | null) => void;
+  observerRef: React.MutableRefObject<MutationObserver | null>;
+  registeredTextareasRef: React.MutableRefObject<Set<HTMLTextAreaElement>>;
+}) => {
+  try {
+    await window.roamAlphaAPI.ui.components.unmountNode({ el: containerEl });
+    await window.roamAlphaAPI.ui.components.renderBlock({ uid, el: containerEl });
+
+    const roamBlockElm = containerEl.querySelector('.rm-block') as HTMLElement | null;
+    setRenderedBlockElm(roamBlockElm);
+    const isCollapsed = roamBlockElm?.classList.contains('rm-block--closed');
+    if (autoExpandRef.current && isCollapsed) {
+      const expandControlBtn = containerEl.querySelector('.block-expand .rm-caret');
+      domUtils.simulateMouseClick(expandControlBtn);
+      await asyncUtils.sleep(100);
+      domUtils.simulateMouseClick(expandControlBtn);
+    } else if (!autoExpandRef.current && !isCollapsed) {
+      await window.roamAlphaAPI.updateBlock({
+        block: { uid, open: false },
+      });
+    }
+
+    // Disconnect any existing observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    // Add a mutation observer to detect dynamically added textareas
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach((node) => {
+            if (node instanceof HTMLElement) {
+              const newTextareas = node.querySelectorAll('textarea');
+              if (newTextareas.length > 0) {
+                newTextareas.forEach((textarea) => {
+                  textarea.removeEventListener('blur', handleBlockBlur);
+                  textarea.addEventListener('blur', handleBlockBlur);
+                  registeredTextareasRef.current.add(textarea);
+                });
+              }
+            }
+          });
+        }
+      });
+    });
+
+    observer.observe(containerEl, { childList: true, subtree: true });
+    observerRef.current = observer;
+
+    // Notify parent that rendering is complete
+    onRenderComplete?.();
+  } catch (err) {
+    console.error('Memo: Failed to render block', err);
+  }
+};
+
 const CardBlock = ({
   refUid,
   showAnswers,
@@ -62,74 +137,53 @@ const CardBlock = ({
     });
   }, []);
 
-  // Set up the debounced function only once when the component mounts
+  // ── Immediate render on card change ──
+  // Separated from the debounced blur re-render to prevent flash:
+  // When refUid changes, React commits the new render with the new
+  // showAnswers CSS immediately, but the Roam block inside ContentWrapper
+  // is still the OLD card's block until renderRoamBlock runs.  If we
+  // debounced this (like the blur re-render), the CSS would show/hide the
+  // old card's children with the new card's showAnswers for 100ms — a flash.
   React.useEffect(() => {
-    const registeredTextareas = registeredTextareasRef.current;
-    const renderBlock = async () => {
-      const currentRefUid = refUidRef.current;
-      if (!ref.current) return;
+    if (!ref.current || !refUid) return;
+    renderRoamBlock({
+      containerEl: ref.current,
+      uid: refUid,
+      autoExpandRef,
+      onRenderComplete,
+      handleBlockBlur,
+      setRenderedBlockElm,
+      observerRef,
+      registeredTextareasRef,
+    });
+  }, [refUid, handleBlockBlur, onRenderComplete]);
 
-      try {
-      await window.roamAlphaAPI.ui.components.unmountNode({ el: ref.current });
-      await window.roamAlphaAPI.ui.components.renderBlock({ uid: currentRefUid, el: ref.current });
+  // ── Debounced re-render for blur-based forceUpdate ──
+  // Textarea blur events can fire rapidly when the user is editing; the
+  // debounce coalesces these into a single re-render.  Not used for refUid
+  // changes (which are handled by the immediate effect above).
+  React.useEffect(() => {
+    if (!ref.current || !refUid) return;
 
-      const roamBlockElm = ref.current.querySelector('.rm-block') as HTMLElement | null;
-      setRenderedBlockElm(roamBlockElm);
-      const isCollapsed = roamBlockElm?.classList.contains('rm-block--closed');
-      if (autoExpandRef.current && isCollapsed) {
-        const expandControlBtn = ref.current.querySelector('.block-expand .rm-caret');
-        domUtils.simulateMouseClick(expandControlBtn);
-        await asyncUtils.sleep(100);
-        domUtils.simulateMouseClick(expandControlBtn);
-      } else if (!autoExpandRef.current && !isCollapsed) {
-        await window.roamAlphaAPI.updateBlock({
-          block: { uid: currentRefUid, open: false },
-        });
-      }
+    const debouncedReRender = asyncUtils.debounce(
+      () =>
+        renderRoamBlock({
+          containerEl: ref.current!,
+          uid: refUidRef.current,
+          autoExpandRef,
+          onRenderComplete,
+          handleBlockBlur,
+          setRenderedBlockElm,
+          observerRef,
+          registeredTextareasRef,
+        }),
+      100
+    );
 
-      // Disconnect any existing observer
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
+    debouncedReRender();
 
-      // Add a mutation observer to detect dynamically added textareas (so we can add blur listeners)
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-            mutation.addedNodes.forEach((node) => {
-              if (node instanceof HTMLElement) {
-                const newTextareas = node.querySelectorAll('textarea');
-                if (newTextareas.length > 0) {
-                  newTextareas.forEach((textarea) => {
-                  textarea.removeEventListener('blur', handleBlockBlur);
-                  textarea.addEventListener('blur', handleBlockBlur);
-                  registeredTextareasRef.current.add(textarea);
-                });
-                }
-              }
-            });
-          }
-        });
-      });
-
-      observer.observe(ref.current, { childList: true, subtree: true });
-      observerRef.current = observer;
-
-      // Notify parent that rendering is complete
-      onRenderComplete?.();
-      } catch (err) {
-        console.error('Memo: Failed to render block', err);
-      }
-    };
-
-    // Create the debounced function only once
-    debouncedFnRef.current = asyncUtils.debounce(renderBlock, 100);
-
-    // Clean up function
     return () => {
-      debouncedFnRef.current = null;
-
-      registeredTextareas.forEach((textarea) => {
+      registeredTextareasRef.current.forEach((textarea) => {
         textarea.removeEventListener('blur', handleBlockBlur);
       });
       registeredTextareasRef.current = new Set();
@@ -139,14 +193,7 @@ const CardBlock = ({
         observerRef.current = null;
       }
     };
-  }, [handleBlockBlur, onRenderComplete]);
-
-  // Call the debounced function when refUid changes
-  React.useEffect(() => {
-    if (debouncedFnRef.current) {
-      debouncedFnRef.current();
-    }
-  }, [refUid, forceUpdate, autoExpand]);
+  }, [forceUpdate, autoExpand, refUid, handleBlockBlur, onRenderComplete]);
 
   return (
     <div>
