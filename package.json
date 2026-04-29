@@ -1,11 +1,8 @@
 {
   "name": "logseq-memo",
   "version": "21",
+  "main": "extension.js",
   "description": "Logseq Spaced Repetition Plugin",
-  "author": "Jose Browne <josebrowne@gmail.com> (http://josebrowne.com/)",
-  "engines": {
-    "node": ">=18"
-  },
   "logseq": {
     "id": "logseq-memo",
     "icon": "icon.png",
@@ -21,30 +18,15 @@
     "lint": "eslint 'src/**/*.{ts,tsx,js,jsx}' 'webpack.config.js' 'jest.setup.ts'",
     "typecheck": "tsc",
     "test": "TZ=UTC jest",
-    "test-dev": "TZ=UTC jest --watch --verbose --runInBand",
-    "test-debug": "TZ=UTC node --inspect-brk node_modules/.bin/jest --runInBand --watch --verbose"
+    "test-dev": "TZ=UTC jest --watch --verbose --runInBand"
   },
   "jest": {
     "testEnvironment": "jsdom",
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "jsx"
-    ],
-    "moduleDirectories": [
-      "node_modules"
-    ],
-    "moduleNameMapper": {
-      "^~(.*)$": "<rootDir>/src$1"
-    },
-    "verbose": false,
-    "setupFiles": [
-      "jest-canvas-mock"
-    ],
-    "setupFilesAfterEnv": [
-      "<rootDir>/jest.setup.ts"
-    ]
+    "moduleFileExtensions": ["ts","tsx","js","jsx"],
+    "moduleDirectories": ["node_modules"],
+    "moduleNameMapper": { "^~(.*)$": "<rootDir>/src$1" },
+    "setupFiles": ["jest-canvas-mock"],
+    "setupFilesAfterEnv": ["<rootDir>/jest.setup.ts"]
   },
   "devDependencies": {
     "@babel/core": "^7.18.10",
@@ -77,7 +59,7 @@
     "webpack-cli": "^4.10.0"
   },
   "license": "ISC",
-  "keywords": ["logseq", "logseq-plugin", "spaced-repetition", "sm2", "memo"],
+  "keywords": ["logseq","logseq-plugin","spaced-repetition","sm2","memo"],
   "dependencies": {
     "@blueprintjs/core": "^3.50.4",
     "@blueprintjs/select": "^3.18.6",
