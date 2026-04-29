@@ -1,6 +1,6 @@
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 
-const baseConfig = {
+module.exports = {
   entry: './src/extension.tsx',
   resolve: {
     plugins: [new TsconfigPathsPlugin({ configFile: './tsconfig.json' })],
@@ -9,8 +9,6 @@ const baseConfig = {
   externals: {
     react: 'React',
     'react-dom': 'ReactDOM',
-    '@blueprintjs/core': ['Blueprint', 'Core'],
-    '@blueprintjs/select': ['Blueprint', 'Select'],
   },
   optimization: {
     splitChunks: false,
@@ -25,10 +23,6 @@ const baseConfig = {
       },
     ],
   },
-};
-
-module.exports = {
-  ...baseConfig,
   output: {
     filename: 'extension.js',
     path: __dirname,

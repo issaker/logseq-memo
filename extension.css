@@ -1,1 +1,26 @@
-/* logseq-memo styles */
+/* logseq-memo Blueprint icon fallback styles */
+.bp3-icon,
+.bp3-icon-small {
+  display: inline-block;
+  flex: 0 0 auto;
+  vertical-align: text-bottom;
+}
+.bp3-icon-small {
+  width: 14px;
+  height: 14px;
+}
+.bp3-icon-box::before {
+  content: '\25A2';
+  font-size: 12px;
+  color: #8a9ba8;
+}
+.bp3-icon-confirm::before {
+  content: '\2713';
+  font-size: 12px;
+  color: #0d8050;
+  font-weight: bold;
+}
+.bp3-icon-standard {
+  width: 16px;
+  height: 16px;
+}

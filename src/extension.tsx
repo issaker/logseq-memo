@@ -3,27 +3,90 @@ import App from './app';
 import { FocusStyleManager } from '@blueprintjs/core';
 import { injectZIndexFixStyles } from './utils/zIndexFix';
 
-const MEMO_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+const SIDEBAR_ID = 'logseq-memo-sidebar';
+const OVERLAY_ID = 'logseq-memo-overlay';
+const MAX_RETRIES = 30;
+const RETRY_INTERVAL = 500;
 
-function main() {
-  FocusStyleManager.onlyShowFocusOnTabs();
-  injectZIndexFixStyles();
-
-  // Create a fixed overlay container for the entire App (overlay needs full viewport)
-  const root = document.createElement('div');
-  root.id = 'logseq-memo-root';
-  root.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;pointer-events:none;';
-  document.body.appendChild(root);
-
-  ReactDOM.render(<App />, root);
-
-  // Register toolbar button — template with inline onclick calls window bridge
-  logseq.App.registerUIItem('toolbar', {
-    key: 'logseq-memo',
-    title: 'Memo Review',
-    icon: MEMO_ICON,
-    template: `<button onclick="window.__logseqMemoToggle && window.__logseqMemoToggle()" class="ui__toolbar-item" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:4px;border:none;background:transparent;cursor:pointer;border-radius:4px;color:var(--ls-primary-text-color,inherit);" title="Memo Review (spaced repetition)">${MEMO_ICON}</button>`,
+function waitForElement(selectors: string[], maxRetries: number, interval: number): Promise<HTMLElement> {
+  return new Promise((resolve, reject) => {
+    let retries = 0;
+    const check = () => {
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el) return resolve(el as HTMLElement);
+      }
+      retries++;
+      if (retries >= maxRetries) return reject(new Error('Element not found: ' + selectors.join(', ')));
+      setTimeout(check, interval);
+    };
+    check();
   });
 }
 
-logseq.ready(main);
+function injectSidebarContainer(): HTMLElement {
+  let c = document.getElementById(SIDEBAR_ID);
+  if (c) return c;
+
+  c = document.createElement('div');
+  c.id = SIDEBAR_ID;
+  c.style.cssText = 'padding:0 12px;margin:4px 0;';
+
+  const sidebar = document.querySelector('.left-sidebar-inner')
+    || document.querySelector('#left-sidebar')
+    || document.querySelector('.cp__sidebar-left-layout')
+    || document.querySelector('.left-sidebar')
+    || document.body;
+
+  sidebar.appendChild(c);
+  return c;
+}
+
+function createOverlayContainer(): HTMLElement {
+  let c = document.getElementById(OVERLAY_ID);
+  if (c) return c;
+
+  c = document.createElement('div');
+  c.id = OVERLAY_ID;
+  c.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;pointer-events:none;';
+  document.body.appendChild(c);
+  return c;
+}
+
+async function main() {
+  FocusStyleManager.onlyShowFocusOnTabs();
+  injectZIndexFixStyles();
+
+  try {
+    await waitForElement(
+      ['.left-sidebar-inner', '#left-sidebar', '.cp__sidebar-left-layout'],
+      MAX_RETRIES,
+      RETRY_INTERVAL
+    );
+  } catch {
+    console.warn('[Memo] Sidebar not found, falling back to body');
+  }
+
+  const sidebarContainer = injectSidebarContainer();
+  createOverlayContainer();
+
+  ReactDOM.render(<App />, sidebarContainer);
+  console.log('[Memo] Plugin loaded');
+}
+
+if (typeof logseq !== 'undefined' && logseq.ready) {
+  logseq.ready(main);
+} else {
+  const retryCount = 0;
+  const tryLogseq = () => {
+    if (typeof logseq !== 'undefined' && logseq.ready) {
+      logseq.ready(main);
+    } else if (retryCount < 20) {
+      setTimeout(tryLogseq, 500);
+    } else {
+      console.warn('[Memo] logseq not found, starting standalone');
+      main();
+    }
+  };
+  setTimeout(tryLogseq, 300);
+}

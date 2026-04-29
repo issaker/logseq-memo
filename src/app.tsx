@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import * as Blueprint from '@blueprintjs/core';
 import PracticeOverlay from '~/components/overlay/PracticeOverlay';
 import SidePanelWidget from '~/components/SidePanelWidget';
@@ -18,10 +19,18 @@ export type handlePracticeProps = Session & {
   refUid: string;
 };
 
+const OVERLAY_ID = 'logseq-memo-overlay';
+
 const App = () => {
   const [showPracticeOverlay, setShowPracticeOverlay] = React.useState(false);
   const [isCramming, setIsCramming] = React.useState(false);
   const [overlayKey, setOverlayKey] = React.useState(0);
+  const [overlayRoot, setOverlayRoot] = React.useState<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    const el = document.getElementById(OVERLAY_ID);
+    if (el) setOverlayRoot(el);
+  }, []);
 
   const {
     settings,
@@ -56,6 +65,10 @@ const App = () => {
   React.useEffect(() => {
     refreshData();
   }, [deckConfigs, refreshData]);
+
+  React.useEffect(() => {
+    (window as any).__logseqMemoToday = today;
+  }, [today]);
 
   const handlePracticeClick = async ({ refUid, ...cardData }: handlePracticeProps) => {
     if (!refUid) {
@@ -104,7 +117,6 @@ const App = () => {
 
   useCollapseReferenceList({ dataPageTitle });
 
-  const tagsOnEnterRef = React.useRef<string[]>([]);
   const tagsListRef = React.useRef(tagsList);
   const showPracticeOverlayRef = React.useRef(showPracticeOverlay);
   const fetchPracticeDataRef = React.useRef(fetchPracticeData);
@@ -135,43 +147,38 @@ const App = () => {
 
   useCommandPaletteAction({ onShowPracticeOverlay });
 
-  // Expose toggle globally so the toolbar button (in extension.tsx) can trigger it
-  React.useEffect(() => {
-    (window as any).__logseqMemoToggle = () => {
-      refreshData();
-      setShowPracticeOverlay(true);
-      setIsCramming(false);
-    };
-    return () => { delete (window as any).__logseqMemoToggle; };
-  }, [refreshData]);
+  const overlayContent = showPracticeOverlay && overlayRoot ? (
+    createPortal(
+      <PracticeSessionProvider
+        key={overlayKey}
+        settings={settings}
+        practiceData={practiceData}
+        today={today}
+        selectedTag={selectedTag}
+        tagsList={tagsList}
+        isCramming={isCramming}
+        setIsCramming={setIsCramming}
+        handlePracticeClick={handlePracticeClick}
+        handleMemoTagChange={handleMemoTagChange}
+        fetchPracticeData={fetchPracticeData}
+        dataPageTitle={dataPageTitle}
+        updateSetting={updateSetting}
+      >
+        <PracticeOverlay
+          isOpen={true}
+          onCloseCallback={onClosePracticeOverlayCallback}
+          onRestartCallback={onRestartPracticeOverlayCallback}
+        />
+      </PracticeSessionProvider>,
+      overlayRoot
+    )
+  ) : null;
 
   return (
     <Blueprint.HotkeysProvider>
       <>
         <SidePanelWidget onClickCallback={onShowPracticeOverlay} today={today} />
-        {showPracticeOverlay && (
-          <PracticeSessionProvider
-            key={overlayKey}
-            settings={settings}
-            practiceData={practiceData}
-            today={today}
-            selectedTag={selectedTag}
-            tagsList={tagsList}
-            isCramming={isCramming}
-            setIsCramming={setIsCramming}
-            handlePracticeClick={handlePracticeClick}
-            handleMemoTagChange={handleMemoTagChange}
-            fetchPracticeData={fetchPracticeData}
-            dataPageTitle={dataPageTitle}
-            updateSetting={updateSetting}
-          >
-            <PracticeOverlay
-              isOpen={true}
-              onCloseCallback={onClosePracticeOverlayCallback}
-              onRestartCallback={onRestartPracticeOverlayCallback}
-            />
-          </PracticeSessionProvider>
-        )}
+        {overlayContent}
       </>
     </Blueprint.HotkeysProvider>
   );

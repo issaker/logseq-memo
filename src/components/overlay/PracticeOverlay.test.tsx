@@ -15,6 +15,18 @@ const expectDateCloseTo = (actual: Date, expected: Date, toleranceMs = 1000) => 
 };
 
 describe('PracticeOverlay', () => {
+  beforeEach(() => {
+    const overlayEl = document.createElement('div');
+    overlayEl.id = 'logseq-memo-overlay';
+    overlayEl.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;pointer-events:none;';
+    document.body.appendChild(overlayEl);
+  });
+
+  afterEach(() => {
+    const el = document.getElementById('logseq-memo-overlay');
+    if (el) el.remove();
+  });
+
   it("renders done state when there's no practice data", async () => {
     new testUtils.MockDataBuilder().mockQueryResults();
     await act(async () => {
