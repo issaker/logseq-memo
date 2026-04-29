@@ -6,14 +6,11 @@ module.exports = {
     plugins: [new TsconfigPathsPlugin({ configFile: './tsconfig.json' })],
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
   },
-  externals: {
-    react: 'React',
-    'react-dom': 'ReactDOM',
-  },
   optimization: {
     splitChunks: false,
+    minimize: false,
   },
-  devtool: process.env.NODE_ENV === 'production' ? 'source-map' : 'inline-source-map',
+  devtool: false,
   module: {
     rules: [
       {

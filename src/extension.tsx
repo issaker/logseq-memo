@@ -1,92 +1,123 @@
 import ReactDOM from 'react-dom';
-import App from './app';
-import { FocusStyleManager } from '@blueprintjs/core';
-import { injectZIndexFixStyles } from './utils/zIndexFix';
+import React from 'react';
 
 const SIDEBAR_ID = 'logseq-memo-sidebar';
-const OVERLAY_ID = 'logseq-memo-overlay';
-const MAX_RETRIES = 30;
-const RETRY_INTERVAL = 500;
+const BANNER_ID = 'logseq-memo-debug';
 
-function waitForElement(selectors: string[], maxRetries: number, interval: number): Promise<HTMLElement> {
-  return new Promise((resolve, reject) => {
-    let retries = 0;
-    const check = () => {
-      for (const sel of selectors) {
-        const el = document.querySelector(sel);
-        if (el) return resolve(el as HTMLElement);
-      }
-      retries++;
-      if (retries >= maxRetries) return reject(new Error('Element not found: ' + selectors.join(', ')));
-      setTimeout(check, interval);
-    };
-    check();
-  });
+function banner(msg: string, color: string) {
+  const el = document.getElementById(BANNER_ID);
+  if (el) el.textContent = msg;
+  console.log('[Memo]', msg);
 }
 
-function injectSidebarContainer(): HTMLElement {
-  let c = document.getElementById(SIDEBAR_ID);
-  if (c) return c;
-
-  c = document.createElement('div');
-  c.id = SIDEBAR_ID;
-  c.style.cssText = 'padding:0 12px;margin:4px 0;';
-
-  const sidebar = document.querySelector('.left-sidebar-inner')
-    || document.querySelector('#left-sidebar')
-    || document.querySelector('.cp__sidebar-left-layout')
-    || document.querySelector('.left-sidebar')
-    || document.body;
-
-  sidebar.appendChild(c);
-  return c;
-}
-
-function createOverlayContainer(): HTMLElement {
-  let c = document.getElementById(OVERLAY_ID);
-  if (c) return c;
-
-  c = document.createElement('div');
-  c.id = OVERLAY_ID;
-  c.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;pointer-events:none;';
-  document.body.appendChild(c);
-  return c;
-}
-
-async function main() {
-  FocusStyleManager.onlyShowFocusOnTabs();
-  injectZIndexFixStyles();
-
-  try {
-    await waitForElement(
-      ['.left-sidebar-inner', '#left-sidebar', '.cp__sidebar-left-layout'],
-      MAX_RETRIES,
-      RETRY_INTERVAL
-    );
-  } catch {
-    console.warn('[Memo] Sidebar not found, falling back to body');
+function ensureDebugBanner() {
+  let el = document.getElementById(BANNER_ID);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = BANNER_ID;
+    el.style.cssText = 'position:fixed;bottom:10px;right:10px;z-index:99999;padding:6px 10px;border-radius:4px;font:12px monospace;color:#fff;background:#d32f2f;';
+    document.body.appendChild(el);
   }
-
-  const sidebarContainer = injectSidebarContainer();
-  createOverlayContainer();
-
-  ReactDOM.render(<App />, sidebarContainer);
-  console.log('[Memo] Plugin loaded');
+  el.textContent = 'Memo: loading...';
+  el.style.display = 'block';
+  return el;
 }
 
-if (typeof logseq !== 'undefined' && logseq.ready) {
-  logseq.ready(main);
+// =========== STEP 0: Script loaded ===========
+ensureDebugBanner();
+banner('STEP0: extension.js executing', '#f57c00');
+
+// =========== STEP 1: Check globals ===========
+const logseqOk = typeof logseq !== 'undefined';
+const reactOk = typeof React !== 'undefined';
+const reactDomOk = typeof ReactDOM !== 'undefined';
+
+banner(
+  'STEP1: logseq=' + logseqOk +
+  ' React=' + reactOk +
+  ' ReactDOM=' + reactDomOk,
+  logseqOk ? '#388e3c' : '#d32f2f'
+);
+
+// =========== STEP 2: Check logseq.ready ===========
+if (!logseqOk) {
+  banner('FATAL: no logseq global', '#d32f2f');
+} else if (typeof logseq.ready !== 'function') {
+  banner('FATAL: logseq.ready not a function, type=' + typeof logseq.ready, '#d32f2f');
 } else {
-  const retryCount = 0;
-  const tryLogseq = () => {
-    if (typeof logseq !== 'undefined' && logseq.ready) {
-      logseq.ready(main);
-    } else if (retryCount < 20) {
-      setTimeout(tryLogseq, 500);
-    } else {
-      console.warn('[Memo] logseq not found, starting standalone');
-      main();
+  banner('STEP2: calling logseq.ready()', '#f57c00');
+
+  logseq.ready(() => {
+    banner('STEP3: logseq.ready callback FIRED!', '#388e3c');
+
+    try {
+      const sidebar =
+        document.querySelector('.left-sidebar-inner') ||
+        document.querySelector('#left-sidebar') ||
+        document.querySelector('.cp__sidebar-left-layout') ||
+        document.querySelector('.left-sidebar');
+
+      if (!sidebar) {
+        banner('STEP4: No sidebar DOM found', '#d32f2f');
+        return;
+      }
+
+      banner('STEP4: sidebar found: ' + sidebar.className.substring(0, 40), '#388e3c');
+
+      // Inject sidebar widget
+      let c = document.getElementById(SIDEBAR_ID);
+      if (!c) {
+        c = document.createElement('div');
+        c.id = SIDEBAR_ID;
+        c.style.cssText = 'padding:0 12px;margin:4px 0;';
+        sidebar.appendChild(c);
+      }
+
+      // Inject overlay container
+      let overlay = document.getElementById('logseq-memo-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'logseq-memo-overlay';
+        overlay.style.cssText =
+          'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;pointer-events:none;';
+        document.body.appendChild(overlay);
+      }
+
+      // Render just the SidePanelWidget entry point — App will mount itself
+      ReactDOM.render(
+        React.createElement('div', {
+          style: {
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            color: 'var(--ls-primary-text-color, #d8e1e8)',
+            padding: '6px 8px',
+            borderRadius: '4px',
+            background: 'var(--ls-secondary-background-color, #30404d)',
+          },
+          onClick: () => alert('[Memo] SidePanel clicked — App not loaded yet'),
+          children: [
+            React.createElement('span', { key: 'icon' }, '📝'),
+            React.createElement('span', { key: 'text' }, 'Memo Review'),
+          ],
+        }),
+        c
+      );
+
+      banner('STEP5: Widget injected SUCCESS', '#388e3c');
+
+      // Hide banner after 5s
+      setTimeout(() => {
+        const el = document.getElementById(BANNER_ID);
+        if (el) el.style.display = 'none';
+      }, 5000);
+    } catch (err: any) {
+      banner('ERROR: ' + err.message, '#d32f2f');
+      console.error('[Memo]', err);
     }
-  };
-  setTimeout(tryLogseq, 300);
+  });
+
+  banner('STEP2b: logseq.ready() registered', '#f57c00');
 }
