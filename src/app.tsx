@@ -135,6 +135,16 @@ const App = () => {
 
   useCommandPaletteAction({ onShowPracticeOverlay });
 
+  // Expose toggle globally so the toolbar button (in extension.tsx) can trigger it
+  React.useEffect(() => {
+    (window as any).__logseqMemoToggle = () => {
+      refreshData();
+      setShowPracticeOverlay(true);
+      setIsCramming(false);
+    };
+    return () => { delete (window as any).__logseqMemoToggle; };
+  }, [refreshData]);
+
   return (
     <Blueprint.HotkeysProvider>
       <>

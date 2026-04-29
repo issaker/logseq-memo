@@ -1,7 +1,7 @@
-# Build output
-/extension.js
-/extension.js.map
-/extension.js.LICENSE.txt
+# Build output (uncomment to exclude large bundles from git)
+# /extension.js
+# /extension.js.map
+# /extension.js.LICENSE.txt
 project-output.txt
 
 # Changelog debug data
