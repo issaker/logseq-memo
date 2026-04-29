@@ -45,6 +45,7 @@ import {
   getOrCreateChildBlock,
   getOrCreatePage,
 } from '~/queries/utils';
+import roamAdapter from '~/queries/roamAdapter';
 import { SESSION_SNAPSHOT_KEYS, getChildSessionData, undoLatestSession } from '~/queries/data';
 
 const NUMERIC_SESSION_KEYS = [
@@ -92,7 +93,7 @@ const upsertLatestSessionField = async ({
   key: string;
   value: string;
 }) => {
-  const cardChildren = await window.roamAlphaAPI.q(
+  const cardChildren = await roamAdapter.q(
     `[:find (pull ?card [:block/children :block/uid {:block/children [:block/uid :block/string :block/order {:block/children [:block/uid :block/string :block/order]}]}])
          :in $ ?cardUid
          :where [?card :block/uid ?cardUid]]`,
@@ -129,7 +130,7 @@ const upsertLatestSessionField = async ({
   });
 
   if (existingField) {
-    await window.roamAlphaAPI.updateBlock({
+    await roamAdapter.updateBlock({
       block: { uid: existingField.uid, string: `${key}:: ${value}` },
     });
   } else {
@@ -167,7 +168,7 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
   const emoji = getEmojiFromGrade(data.sm2_grade, data.algorithm);
   const sessionBlockTitle = `[[${dateCreatedRoamDateString}]] ${emoji}`;
 
-  const existingCardChildren = await window.roamAlphaAPI.q(
+  const existingCardChildren = await roamAdapter.q(
     `[:find (pull ?card [:block/children :block/uid {:block/children [:block/uid :block/string :block/order {:block/children [:block/uid :block/string :block/order]}]}])
          :in $ ?cardUid
          :where [?card :block/uid ?cardUid]]`,
@@ -348,7 +349,7 @@ export const deduplicateSessionFields = async ({
     [?pluginPageChildren :block/string ?dataBlockName]
   ]`;
 
-  const queryResultsData = await window.roamAlphaAPI.q(query, dataPageTitle, 'data');
+  const queryResultsData = await roamAdapter.q(query, dataPageTitle, 'data');
   const dataChildren = queryResultsData.map((arr) => arr[0])[0]?.children || [];
 
   let cleaned = 0;
@@ -379,7 +380,7 @@ export const deduplicateSessionFields = async ({
         for (const block of blocks) {
           if (block.uid === keepBlock.uid) continue;
           try {
-            await window.roamAlphaAPI.deleteBlock({ block: { uid: block.uid } });
+            await roamAdapter.deleteBlock({ block: { uid: block.uid } });
             cleaned++;
           } catch (err) {
             console.error(`[Memo] Dedup error deleting ${key} block ${block.uid}:`, err);

@@ -53,6 +53,7 @@ import {
   getOrCreateChildBlock,
 } from './utils';
 import { DAILYNOTE_DECK_KEY } from '~/constants';
+import roamAdapter from '~/queries/roamAdapter';
 import { DeckConfig } from '~/hooks/useSettings';
 
 export const getPracticeData = async ({
@@ -116,9 +117,9 @@ export const dataPageReferencesIdsQuery = `[
   ]`;
 
 const getPageReferenceIds = async (tag, dataPageTitle): Promise<string[]> => {
-  const dataPageResult = window.roamAlphaAPI.q(getDataPageQuery(dataPageTitle));
+  const dataPageResult = await roamAdapter.q(getDataPageQuery(dataPageTitle));
   const dataPageUid = dataPageResult.length ? dataPageResult[0][0] : '';
-  const results = window.roamAlphaAPI.q(dataPageReferencesIdsQuery, tag, dataPageUid);
+  const results = await roamAdapter.q(dataPageReferencesIdsQuery, tag, dataPageUid);
   return results.map((arr) => arr[0]);
 };
 
@@ -377,7 +378,7 @@ export const getPluginPageBlockDataQuery = `[
   ]`;
 
 const getPluginPageBlockData = async ({ dataPageTitle, blockName }) => {
-  return await window.roamAlphaAPI.q(getPluginPageBlockDataQuery, dataPageTitle, blockName);
+  return await roamAdapter.q(getPluginPageBlockDataQuery, dataPageTitle, blockName);
 };
 
 export const getPluginPageData = async ({ dataPageTitle, limitToLatest = true }) => {
@@ -728,7 +729,7 @@ export const undoLatestSession = async ({
     open: false,
   });
 
-  const existingCardChildren = await window.roamAlphaAPI.q(
+  const existingCardChildren = await roamAdapter.q(
     `[:find (pull ?card [:block/children :block/uid {:block/children [:block/uid :block/string :block/order {:block/children [:block/uid :block/string :block/order]}]}])
          :in $ ?cardUid
          :where [?card :block/uid ?cardUid]]`,
@@ -746,6 +747,6 @@ export const undoLatestSession = async ({
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   if (dateBlocks.length > 0 && dateBlocks[0].uid) {
-    await window.roamAlphaAPI.deleteBlock({ block: { uid: dateBlocks[0].uid } });
+    await roamAdapter.deleteBlock({ block: { uid: dateBlocks[0].uid } });
   }
 };

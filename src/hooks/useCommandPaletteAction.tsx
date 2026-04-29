@@ -12,13 +12,16 @@ interface CommandPaletteAction {
 const useCommandPaletteAction = ({ onShowPracticeOverlay }: CommandPaletteAction) => {
   React.useEffect(() => {
     const startLabel = 'Memo: Start Review Session';
-    window.roamAlphaAPI.ui.commandPalette.addCommand({
+    logseq.App.registerCommand('logseq-memo', {
+      key: 'start-review-session',
       label: startLabel,
-      callback: () => onShowPracticeOverlay(),
-    });
+    }, () => onShowPracticeOverlay());
 
     return () => {
-      window.roamAlphaAPI.ui.commandPalette.removeCommand({ label: startLabel });
+      logseq.App.registerCommand('logseq-memo', {
+        key: 'start-review-session',
+        label: startLabel,
+      }, () => {});
     };
   }, [onShowPracticeOverlay]);
 };

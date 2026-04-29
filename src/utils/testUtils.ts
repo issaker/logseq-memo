@@ -19,34 +19,24 @@ import * as testUtils from '~/utils/testUtils';
 import * as queries from '~/queries/save';
 import * as practice from '~/practice';
 
-export const mockQueryResult = ({ queryMocks, settingsMock, tagsList }) => {
-  const mockRoamAlphaAPI = generateMockRoamAlphaAPI({ queryMocks, tagsList });
+import roamAdapter from '~/queries/roamAdapter';
 
-  Object.defineProperty(window, 'roamAlphaAPI', {
-    value: mockRoamAlphaAPI,
-    writable: true,
+export const mockQueryResult = ({ queryMocks, settingsMock, tagsList }) => {
+  mockOtherDependencies({ settingsMock });
+
+  const qMock = jest.fn((q: string, ...queryArgs: any[]) => {
+    const mockRoamAPI = generateMockRoamAlphaAPI({ queryMocks, tagsList });
+    return mockRoamAPI.q(q, ...queryArgs);
   });
 
-  mockOtherDependencies({ settingsMock });
+  (roamAdapter as any).q = qMock;
 };
 
 const mockOtherDependencies = ({ settingsMock }) => {
-  Object.defineProperty(window, 'roamMemo', {
-    value: {
-      extensionAPI: {
-        settings: {
-          getAll: () => settingsMock,
-          panel: {
-            create: () => {},
-          },
-        },
-      },
-    },
-    writable: true,
-  });
+  (logseq as any).settings = { ...settingsMock };
 };
 
-export const dataPageTitle = 'roam/memo';
+export const dataPageTitle = 'logseq-memo/data';
 const dataPageUid = 1234;
 const undefinedDataPageUid = '';
 const mockBlockInfo = {
@@ -75,7 +65,7 @@ export const generateMockRoamAlphaAPI = ({
   q: jest.fn((q, ...queryArgs) => {
     const defaultMocks: MockQuery[] = [
       {
-        query: getDataPageQuery('roam/memo'),
+        query: getDataPageQuery(dataPageTitle),
         result: [[dataPageUid]],
         shouldReturnPromise: false,
       },
@@ -240,7 +230,7 @@ export class MockDataBuilder {
     const queryMocks: MockQuery[] = [];
 
     queryMocks.push({
-      query: getDataPageQuery('roam/memo'),
+      query: getDataPageQuery(dataPageTitle),
       result: [],
       shouldReturnPromise: false,
     });
@@ -319,7 +309,13 @@ export class MockDataBuilder {
     return {
       ...defaultSettings,
       ...this.settingsOverride,
-      deckConfigs: JSON.stringify(this.tags.map((name) => ({ name, swapQA: false, weight: Math.round(100 / this.tags.length) }))),
+      deckConfigs: JSON.stringify(
+        this.tags.map((name) => ({
+          name,
+          swapQA: false,
+          weight: Math.round(100 / this.tags.length),
+        }))
+      ),
       isCramming: false,
     };
   }

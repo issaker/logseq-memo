@@ -14,6 +14,7 @@
  */
 import * as React from 'react';
 import { Alert } from '@blueprintjs/core';
+import roamAdapter from '~/queries/roamAdapter';
 import {
   SchedulingAlgorithm,
   InteractionStyle,
@@ -308,7 +309,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         [?pluginPageChildren :block/string ?dataBlockName]
       ]`;
 
-      const queryResultsData = await window.roamAlphaAPI.q(query, dataPageTitle, 'data');
+      const queryResultsData = await roamAdapter.q(query, dataPageTitle, 'data');
       const dataChildren = queryResultsData.map((arr) => arr[0])[0]?.children || [];
 
       const pluginPageData = await getPluginPageData({ dataPageTitle, limitToLatest: false });
@@ -433,7 +434,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         [?pluginPageChildren :block/string ?dataBlockName]
       ]`;
 
-      const queryResultsData = await window.roamAlphaAPI.q(query, dataPageTitle, 'data');
+      const queryResultsData = await roamAdapter.q(query, dataPageTitle, 'data');
       const dataChildren = queryResultsData.map((arr) => arr[0])[0]?.children || [];
 
       const pluginPageData = await getPluginPageData({ dataPageTitle, limitToLatest: false });
@@ -544,7 +545,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
         try {
           if (task.needsCardTypeRename && task.cardTypeBlockUid && task.cardTypeBlockValue) {
-            await window.roamAlphaAPI.updateBlock({
+            await roamAdapter.updateBlock({
               block: {
                 uid: task.cardTypeBlockUid,
                 string: `reviewMode:: ${task.cardTypeBlockValue}`,
@@ -566,7 +567,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
           if (task.needsDuplicateCleanup && task.duplicateBlockUids.length > 0) {
             for (const uid of task.duplicateBlockUids) {
-              await window.roamAlphaAPI.deleteBlock({ block: { uid } });
+              await roamAdapter.deleteBlock({ block: { uid } });
             }
             debugLog(`[Memo] Phase 1: card ${task.cardUid} — cleaned ${task.duplicateBlockUids.length} duplicate blocks`);
           }
@@ -575,28 +576,28 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
             const { reviewMode, nextDueDate, lineByLineProgress } = task.metaFields;
 
             if (reviewMode && task.latestSessionBlockUid) {
-              await window.roamAlphaAPI.createBlock({
+              await roamAdapter.createBlock({
                 location: { 'parent-uid': task.latestSessionBlockUid, order: -1 },
                 block: { string: `reviewMode:: ${reviewMode.value}`, open: false },
               });
             }
 
             if (nextDueDate && task.latestSessionBlockUid) {
-              await window.roamAlphaAPI.createBlock({
+              await roamAdapter.createBlock({
                 location: { 'parent-uid': task.latestSessionBlockUid, order: -1 },
                 block: { string: `nextDueDate:: ${nextDueDate.value}`, open: false },
               });
             }
 
             if (lineByLineProgress && task.latestSessionBlockUid) {
-              await window.roamAlphaAPI.createBlock({
+              await roamAdapter.createBlock({
                 location: { 'parent-uid': task.latestSessionBlockUid, order: -1 },
                 block: { string: `lineByLineProgress:: ${lineByLineProgress.value}`, open: false },
               });
             }
 
             if (task.metaBlockUid) {
-              await window.roamAlphaAPI.deleteBlock({ block: { uid: task.metaBlockUid } });
+              await roamAdapter.deleteBlock({ block: { uid: task.metaBlockUid } });
             }
             debugLog(`[Memo] Phase 1: card ${task.cardUid} — merged meta block into session`);
           }
@@ -635,7 +636,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         let deleted = 0;
         for (let i = 0; i < allSessionUids.length; i++) {
           try {
-            await window.roamAlphaAPI.deleteBlock({ block: { uid: allSessionUids[i] } });
+            await roamAdapter.deleteBlock({ block: { uid: allSessionUids[i] } });
             deleted++;
           } catch (err) {
             const msg = `Session cleanup block ${allSessionUids[i]}: ${err instanceof Error ? err.message : String(err)}`;
@@ -679,21 +680,21 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
             }
 
             if (!task.hasAlgorithm) {
-              await window.roamAlphaAPI.createBlock({
+              await roamAdapter.createBlock({
                 location: { 'parent-uid': task.latestSessionBlockUid, order: -1 },
                 block: { string: `algorithm:: ${task.algorithm}`, open: false },
               });
             }
 
             if (!task.hasInteraction) {
-              await window.roamAlphaAPI.createBlock({
+              await roamAdapter.createBlock({
                 location: { 'parent-uid': task.latestSessionBlockUid, order: -1 },
                 block: { string: `interaction:: ${task.interaction}`, open: false },
               });
             }
 
             for (const field of task.reviewModeFields) {
-              await window.roamAlphaAPI.deleteBlock({ block: { uid: field.uid } });
+              await roamAdapter.deleteBlock({ block: { uid: field.uid } });
             }
 
             debugLog(`[Memo] Phase 3: card ${task.cardUid} — reviewMode=${task.resolvedMode} → algorithm=${task.algorithm}, interaction=${task.interaction} (SUCCESS)`);
@@ -786,7 +787,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         [?pluginPageChildren :block/string ?dataBlockName]
       ]`;
 
-      const renameQueryResults = await window.roamAlphaAPI.q(renameQuery, dataPageTitle, 'data');
+      const renameQueryResults = await roamAdapter.q(renameQuery, dataPageTitle, 'data');
       const renameDataChildren = renameQueryResults.map((arr) => arr[0])[0]?.children || [];
 
       let phase4Renamed = 0;
@@ -823,7 +824,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
           for (const field of collectedFields) {
             if (FIELDS_TO_DELETE.includes(field.key)) {
               try {
-                await window.roamAlphaAPI.deleteBlock({ block: { uid: field.uid } });
+                await roamAdapter.deleteBlock({ block: { uid: field.uid } });
                 phase4Deleted++;
               } catch (err) {
                 console.error(`[Memo] Phase 4 delete error for ${field.key}:`, err);
@@ -835,7 +836,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
             if (field.key === 'interaction' && field.value === 'READ') {
               try {
-                await window.roamAlphaAPI.updateBlock({
+                await roamAdapter.updateBlock({
                   block: { uid: field.uid, string: 'interaction:: LBL' },
                 });
                 phase4ReadConverted++;
@@ -851,7 +852,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
               const targetKey = intervalMultiplierTarget;
               if (fieldKeys.has(targetKey) || newKeysCreated.has(targetKey)) {
                 try {
-                  await window.roamAlphaAPI.deleteBlock({ block: { uid: field.uid } });
+                  await roamAdapter.deleteBlock({ block: { uid: field.uid } });
                   phase4Deleted++;
                 } catch (err) {
                   console.error(`[Memo] Phase 4 delete intervalMultiplier error:`, err);
@@ -860,7 +861,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                 }
               } else {
                 try {
-                  await window.roamAlphaAPI.updateBlock({
+                  await roamAdapter.updateBlock({
                     block: { uid: field.uid, string: `${targetKey}:: ${field.value}` },
                   });
                   newKeysCreated.add(targetKey);
@@ -878,7 +879,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
               const targetKey = FIELD_RENAME_MAP[field.key];
               if (fieldKeys.has(targetKey) || newKeysCreated.has(targetKey)) {
                 try {
-                  await window.roamAlphaAPI.deleteBlock({ block: { uid: field.uid } });
+                  await roamAdapter.deleteBlock({ block: { uid: field.uid } });
                   phase4Deleted++;
                 } catch (err) {
                   console.error(`[Memo] Phase 4 delete ${field.key} (target ${targetKey} exists) error:`, err);
@@ -887,7 +888,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                 }
               } else {
                 try {
-                  await window.roamAlphaAPI.updateBlock({
+                  await roamAdapter.updateBlock({
                     block: { uid: field.uid, string: `${targetKey}:: ${field.value}` },
                   });
                   newKeysCreated.add(targetKey);
@@ -910,7 +911,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
             if (progRepsField) {
               try {
                 const interval = progressiveInterval(Number(progRepsField.value));
-                await window.roamAlphaAPI.createBlock({
+                await roamAdapter.createBlock({
                   location: { 'parent-uid': sessionBlock.uid, order: -1 },
                   block: { string: `progressive_interval:: ${interval}`, open: false },
                 });
@@ -960,7 +961,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
           [?pluginPageChildren :block/string ?dataBlockName]
         ]`;
 
-        const compactQueryResults = await window.roamAlphaAPI.q(compactQuery, dataPageTitle, 'data');
+        const compactQueryResults = await roamAdapter.q(compactQuery, dataPageTitle, 'data');
         const compactDataChildren = compactQueryResults.map((arr) => arr[0])[0]?.children || [];
 
         for (const cardChild of compactDataChildren) {
@@ -1006,7 +1007,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
             if (value === undefined || value === null) continue;
 
             if (key === 'nextDueDate' && value instanceof Date) {
-              const dateStr = window.roamAlphaAPI.util.dateToPageTitle(value);
+              const dateStr = roamAdapter.util.dateToPageTitle(value);
               missingFields.push({ key, value: `[[${dateStr}]]` });
             } else {
               missingFields.push({ key, value: String(value) });
@@ -1020,7 +1021,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
           try {
             for (const { key, value } of missingFields) {
-              await window.roamAlphaAPI.createBlock({
+              await roamAdapter.createBlock({
                 location: { 'parent-uid': latestBlock.uid, order: -1 },
                 block: { string: `${key}:: ${value}`, open: false },
               });
@@ -1066,7 +1067,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
       let phase6Errors = 0;
 
       try {
-        const lblDataPageUid = await window.roamAlphaAPI.q(
+        const lblDataPageUid = await roamAdapter.q(
           `[:find ?uid . :in $ ?title :where [?b :node/title ?title] [?b :block/uid ?uid]]`,
           dataPageTitle
         );
@@ -1081,7 +1082,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
             [?dataBlock :block/string ?dataBlockName]
           ]`;
 
-          const lblDataBlockResult = await window.roamAlphaAPI.q(lblDataBlockQuery, lblDataPageUid, 'data');
+          const lblDataBlockResult = await roamAdapter.q(lblDataBlockQuery, lblDataPageUid, 'data');
 
           if (lblDataBlockResult && lblDataBlockResult.length && lblDataBlockResult[0][0]) {
             const lblDataBlock = lblDataBlockResult[0][0];
@@ -1125,7 +1126,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                     const [key] = parseConfigString(fieldBlock.string || '');
                     if (key === 'lbl_progress' || key === 'lineByLineProgress') {
                       try {
-                        await window.roamAlphaAPI.deleteBlock({ block: { uid: fieldBlock.uid } });
+                        await roamAdapter.deleteBlock({ block: { uid: fieldBlock.uid } });
                         phase6Migrated++;
                       } catch (err) {
                         console.error(`[Memo] Phase 6 delete lbl_progress error for card ${cardUid}:`, err);
@@ -1163,7 +1164,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                   if (!childData) continue;
 
                   const childCardString = `((${childUid}))`;
-                  const existingChildBlock = await window.roamAlphaAPI.q(
+                  const existingChildBlock = await roamAdapter.q(
                     `[:find (pull ?b [:block/uid]) :in $ ?parentUid ?childStr :where [?parent :block/uid ?parentUid] [?parent :block/children ?b] [?b :block/string ?childStr]]`,
                     lblDataBlock.uid,
                     childCardString
@@ -1174,16 +1175,16 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                   }
 
                   const now = new Date();
-                  const dateStr = window.roamAlphaAPI.util.dateToPageTitle(now);
+                  const dateStr = roamAdapter.util.dateToPageTitle(now);
 
                   const algorithm = sessionData.algorithm || SchedulingAlgorithm.PROGRESSIVE;
 
-                  await window.roamAlphaAPI.createBlock({
+                  await roamAdapter.createBlock({
                     location: { 'parent-uid': lblDataBlock.uid, order: -1 },
                     block: { string: childCardString, open: false },
                   });
 
-                  const createdChildBlock = await window.roamAlphaAPI.q(
+                  const createdChildBlock = await roamAdapter.q(
                     `[:find (pull ?b [:block/uid]) :in $ ?parentUid ?childStr :where [?parent :block/uid ?parentUid] [?parent :block/children ?b] [?b :block/string ?childStr]]`,
                     lblDataBlock.uid,
                     childCardString
@@ -1194,12 +1195,12 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                   const childDataBlockUid = createdChildBlock[0][0].uid;
                   const sessionTitle = `[[${dateStr}]] 🟢`;
 
-                  await window.roamAlphaAPI.createBlock({
+                  await roamAdapter.createBlock({
                     location: { 'parent-uid': childDataBlockUid, order: 0 },
                     block: { string: sessionTitle, open: false },
                   });
 
-                  const createdSessionBlock = await window.roamAlphaAPI.q(
+                  const createdSessionBlock = await roamAdapter.q(
                     `[:find (pull ?b [:block/uid]) :in $ ?parentUid ?title :where [?parent :block/uid ?parentUid] [?parent :block/children ?b] [?b :block/string ?title]]`,
                     childDataBlockUid,
                     sessionTitle
@@ -1215,7 +1216,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
                   if (childData.nextDueDate) {
                     const dueDate = new Date(childData.nextDueDate);
-                    const dueDateStr = window.roamAlphaAPI.util.dateToPageTitle(dueDate);
+                    const dueDateStr = roamAdapter.util.dateToPageTitle(dueDate);
                     fieldsToCreate.push(`nextDueDate:: [[${dueDateStr}]]`);
                   }
 
@@ -1242,7 +1243,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                   }
 
                   for (const fieldString of fieldsToCreate) {
-                    await window.roamAlphaAPI.createBlock({
+                    await roamAdapter.createBlock({
                       location: { 'parent-uid': newSessionUid, order: -1 },
                       block: { string: fieldString, open: false },
                     });
@@ -1254,7 +1255,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                   for (const fieldBlock of sessionBlock.children) {
                     const [key] = parseConfigString(fieldBlock.string || '');
                     if (key === 'lbl_progress' || key === 'lineByLineProgress') {
-                      await window.roamAlphaAPI.deleteBlock({ block: { uid: fieldBlock.uid } });
+                      await roamAdapter.deleteBlock({ block: { uid: fieldBlock.uid } });
                     }
                   }
                 }
@@ -1321,7 +1322,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
           [?pluginPageChildren :block/string ?dataBlockName]
         ]`;
 
-        const p7QueryResults = await window.roamAlphaAPI.q(p7Query, dataPageTitle, 'data');
+        const p7QueryResults = await roamAdapter.q(p7Query, dataPageTitle, 'data');
         const p7DataChildren = p7QueryResults.map((arr) => arr[0])[0]?.children || [];
 
         for (const cardChild of p7DataChildren) {
@@ -1343,7 +1344,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                 hasLegacyAlgorithm = true;
                 legacyAlgorithmValue = value;
                 try {
-                  await window.roamAlphaAPI.updateBlock({
+                  await roamAdapter.updateBlock({
                     block: { uid: fieldBlock.uid, string: 'algorithm:: FIXED_TIME' },
                   });
                 } catch (err) {
@@ -1356,7 +1357,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
             if (hasLegacyAlgorithm) {
               try {
-                await window.roamAlphaAPI.createBlock({
+                await roamAdapter.createBlock({
                   location: { 'parent-uid': sessionBlock.uid, order: -1 },
                   block: { string: `fixed_unit:: ${LEGACY_FIXED_MAP[legacyAlgorithmValue]}`, open: false },
                 });
@@ -1375,7 +1376,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                 }
               }
               if (!hasFixedMultiplier) {
-                await window.roamAlphaAPI.createBlock({
+                await roamAdapter.createBlock({
                   location: { 'parent-uid': sessionBlock.uid, order: -1 },
                   block: { string: 'fixed_multiplier:: 3', open: false },
                 });

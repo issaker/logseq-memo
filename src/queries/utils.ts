@@ -10,6 +10,7 @@
  * - createChildBlock: Creates a child block under a parent
  * - generateNewSession: Creates default session data for new cards
  */
+import roamAdapter from '~/queries/roamAdapter';
 import {
   NewSession,
   SchedulingAlgorithm,
@@ -28,7 +29,7 @@ export const parentChainInfoQuery = `[
   ]`;
 
 const getParentChainInfo = async ({ refUid }) => {
-  const dataResults = await window.roamAlphaAPI.q(parentChainInfoQuery, refUid);
+  const dataResults = await roamAdapter.q(parentChainInfoQuery, refUid);
   return dataResults.map((r) => r[0]);
 };
 
@@ -54,7 +55,7 @@ export const blockInfoQuery = `[
   ]`;
 
 export const fetchBlockInfo: (refUid: any) => Promise<BlockInfo> = async (refUid) => {
-  const blockInfo = (await window.roamAlphaAPI.q(blockInfoQuery, refUid))[0][0];
+  const blockInfo = (await roamAdapter.q(blockInfoQuery, refUid))[0][0];
   const parentChainInfo = await getParentChainInfo({ refUid });
 
   const sortedChildren = blockInfo.children?.sort((a, b) => a.order - b.order);
@@ -62,17 +63,19 @@ export const fetchBlockInfo: (refUid: any) => Promise<BlockInfo> = async (refUid
   let breadcrumbs = parentChainInfo;
 
   if (parentChainInfo.length > 1) {
-    const breadcrumbsWithDepth = parentChainInfo.map((parent) => {
-      const parentData = window.roamAlphaAPI.pull(
-        '[:block/uid {:block/parents [:block/uid]}]',
-        [':block/uid', parent.uid]
-      );
+    const breadcrumbsWithDepth = await Promise.all(
+      parentChainInfo.map(async (parent) => {
+        const parentData = await roamAdapter.pull(
+          '[:block/uid {:block/parents [:block/uid]}]',
+          `:block/uid ${parent.uid}`
+        );
 
-      return {
-        ...parent,
-        depth: parentData?.[':block/parents']?.length || 0,
-      };
-    });
+        return {
+          ...parent,
+          depth: parentData?.[':block/parents']?.length || 0,
+        };
+      })
+    );
 
     breadcrumbs = breadcrumbsWithDepth
       .sort((a, b) => a.depth - b.depth)
@@ -95,24 +98,24 @@ export const getPageQuery = `[
     [?page :block/uid ?uid]
 ]`;
 
-const getPage = (page) => {
-  const results = window.roamAlphaAPI.q(getPageQuery, page);
+const getPage = async (page) => {
+  const results = await roamAdapter.q(getPageQuery, page);
   if (results.length) {
     return results[0][0];
   }
 };
 
 export const getOrCreatePage = async (pageTitle) => {
-  const page = getPage(pageTitle);
+  const page = await getPage(pageTitle);
   if (page) return page;
-  const uid = window.roamAlphaAPI.util.generateUID();
-  await window.roamAlphaAPI.data.page.create({ page: { title: pageTitle, uid } });
+  const uid = roamAdapter.util.generateUID();
+  await roamAdapter.data.page.create({ page: { title: pageTitle, uid } });
 
-  return getPage(pageTitle);
+  return await getPage(pageTitle);
 };
 
-export const getBlockOnPage = (page, block) => {
-  const results = window.roamAlphaAPI.q(
+export const getBlockOnPage = async (page, block) => {
+  const results = await roamAdapter.q(
     `
     [:find ?block_uid
      :in $ ?page_title ?block_string
@@ -131,7 +134,7 @@ export const getBlockOnPage = (page, block) => {
   }
 };
 
-export const getChildBlock = (
+export const getChildBlock = async (
   parent_uid: string,
   block: string,
   options: {
@@ -165,7 +168,7 @@ export const getChildBlock = (
 
   const query = options.exactMatch ? exactMatchQuery : startsWithQuery;
 
-  const results = window.roamAlphaAPI.q(query, parent_uid, block);
+  const results = await roamAdapter.q(query, parent_uid, block);
   if (results.length) {
     return results[0][0];
   }
@@ -184,7 +187,7 @@ export const childBlocksOnPageQuery = `[
   ]`;
 
 export const getChildBlocksOnPage = async (page) => {
-  const queryResults = await window.roamAlphaAPI.q(childBlocksOnPageQuery, page);
+  const queryResults = await roamAdapter.q(childBlocksOnPageQuery, page);
   if (!queryResults.length) return [];
   return queryResults;
 };
@@ -210,7 +213,7 @@ export const pageTopLevelBlocksQuery = `
 `;
 
 export const getDailyNoteBlockUids = async (): Promise<string[]> => {
-  const pages = window.roamAlphaAPI.q(allPagesQuery);
+  const pages = await roamAdapter.q(allPagesQuery);
 
   const dailyNotePageUids = pages
     .filter((arr) => DAILY_NOTE_TITLE_PATTERN.test(arr[1]))
@@ -231,7 +234,7 @@ export const getDailyNoteBlockUids = async (): Promise<string[]> => {
      [?block :block/string ?str]
      [(not= ?str "")]]
   `;
-  const results = window.roamAlphaAPI.q(allBlocksQuery, dailyNotePageUids);
+  const results = await roamAdapter.q(allBlocksQuery, dailyNotePageUids);
   return results.map((arr) => arr[0]);
 };
 
@@ -240,8 +243,8 @@ export const createChildBlock = async (parent_uid, block, order, blockProps = {}
     order = 0;
   }
 
-  const uid = window.roamAlphaAPI.util.generateUID();
-  await window.roamAlphaAPI.createBlock({
+  const uid = roamAdapter.util.generateUID();
+  await roamAdapter.createBlock({
     location: { 'parent-uid': parent_uid, order: order },
     block: { string: block, uid, ...blockProps },
   });
@@ -250,18 +253,18 @@ export const createChildBlock = async (parent_uid, block, order, blockProps = {}
 };
 
 export const createBlockOnPage = async (page, block, order, blockProps) => {
-  const page_uid = getPage(page);
+  const page_uid = await getPage(page);
   return createChildBlock(page_uid, block, order, blockProps);
 };
 
 export const getOrCreateBlockOnPage = async (page, block, order, blockProps) => {
-  const block_uid = getBlockOnPage(page, block);
+  const block_uid = await getBlockOnPage(page, block);
   if (block_uid) return block_uid;
   return createBlockOnPage(page, block, order, blockProps);
 };
 
 export const getOrCreateChildBlock = async (parent_uid, block, order, blockProps) => {
-  const block_uid = getChildBlock(parent_uid, block);
+  const block_uid = await getChildBlock(parent_uid, block);
   if (block_uid) return block_uid;
   return createChildBlock(parent_uid, block, order, blockProps);
 };

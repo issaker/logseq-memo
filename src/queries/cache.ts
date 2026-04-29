@@ -27,7 +27,7 @@ export const saveCacheData = async ({ dataPageTitle, data, selectedTag }) => {
       exactMatch: false,
     });
     if (existingBlockUid) {
-      await window.roamAlphaAPI.deleteBlock({ block: { uid: existingBlockUid } });
+      await logseq.Editor.removeBlock(existingBlockUid);
     }
 
     let value = data[key];
@@ -55,6 +55,6 @@ export const deleteCacheDataKey = async ({ dataPageTitle, selectedTag, toDeleteK
   });
 
   if (existingBlockUid) {
-    await window.roamAlphaAPI.deleteBlock({ block: { uid: existingBlockUid } });
+    await logseq.Editor.removeBlock(existingBlockUid);
   }
 };

@@ -30,10 +30,14 @@ const renderRoamBlock = async ({
   registeredTextareasRef: React.MutableRefObject<Set<HTMLTextAreaElement>>;
 }) => {
   try {
-    await window.roamAlphaAPI.ui.components.unmountNode({ el: containerEl });
-    await window.roamAlphaAPI.ui.components.renderBlock({ uid, el: containerEl });
+    containerEl.innerHTML = '';
 
-    const roamBlockElm = containerEl.querySelector('.rm-block') as HTMLElement | null;
+    const block = await logseq.api.get_block(uid);
+    if (block && block.content) {
+      containerEl.textContent = block.content;
+    }
+
+    const roamBlockElm = containerEl as HTMLElement;
     setRenderedBlockElm(roamBlockElm);
     const isCollapsed = roamBlockElm?.classList.contains('rm-block--closed');
     if (autoExpandRef.current && isCollapsed) {

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import * as stringUtils from '~/utils/string';
+import roamAdapter from '~/queries/roamAdapter';
 import { colors } from '~/theme';
 
 const BATCH_SIZE = 20;
@@ -43,7 +44,7 @@ const HistoryCleanupSection = ({
         [?pluginPageChildren :block/string ?dataBlockName]
       ]`;
 
-      const queryResultsData = await window.roamAlphaAPI.q(query, dataPageTitle, 'data');
+      const queryResultsData = await roamAdapter.q(query, dataPageTitle, 'data');
       const dataChildren = queryResultsData.map((arr) => arr[0])[0]?.children || [];
 
       const total = dataChildren.length;
@@ -79,7 +80,7 @@ const HistoryCleanupSection = ({
 
         for (const block of blocksToDelete) {
           try {
-            await window.roamAlphaAPI.deleteBlock({ block: { uid: block.uid } });
+            await roamAdapter.deleteBlock({ block: { uid: block.uid } });
             totalDeleted++;
           } catch (err) {
             console.error(`[Memo] History cleanup error deleting block ${block.uid}:`, err);

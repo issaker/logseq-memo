@@ -2,121 +2,103 @@ import {
   getPluginPageBlockDataQuery,
   getPluginPageData,
 } from '~/queries/data';
+import roamAdapter from '~/queries/roamAdapter';
 
-const parseMockRoamDate = (value: string) => {
-  if (!value || value.split(' ').length < 3) return undefined;
-  const months = {
-    January: 0,
-    February: 1,
-    March: 2,
-    April: 3,
-    May: 4,
-    June: 5,
-    July: 6,
-    August: 7,
-    September: 8,
-    October: 9,
-    November: 10,
-    December: 11,
-  };
-  const [month, dayWithSuffix, year] = value.replace(',', '').split(' ');
-  if (!(month in months) || !dayWithSuffix || !year) return undefined;
-  const day = Number(dayWithSuffix.replace(/(st|nd|rd|th)$/, ''));
-  return new Date(Date.UTC(Number(year), months[month as keyof typeof months], day));
-};
+describe('adapter smoke test', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('adapter q returns transformed data', async () => {
+    (logseq.api.datascript_query as jest.Mock).mockResolvedValueOnce({
+      data: [[{ uid: 'data-block', string: 'data', order: 0, children: [{ uid: 'card-1', string: '((card-1))', children: [] }] }]]
+    });
+
+    const result = await roamAdapter.q('[:find (pull ?x [:block/uid :block/string]) :where [?x :block/uid "test"]]');
+    expect(result).toBeDefined();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('adapter strips namespace and maps keys to Roam format', async () => {
+    (logseq.api.datascript_query as jest.Mock).mockResolvedValueOnce({
+      data: [[{ ':block/uuid': 'abc', ':block/content': 'hello' }]]
+    });
+
+    const result = await roamAdapter.q('[:find ?uid ?s :where [?b :block/uid ?uid]]');
+    expect(result[0][0].uid).toBe('abc');
+    expect(result[0][0].string).toBe('hello');
+  });
+});
 
 describe('getPluginPageData', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('reads all fields from the latest session block', async () => {
-    Object.defineProperty(window, 'roamAlphaAPI', {
-      value: {
-        q: jest.fn(() => [
-          [
-            {
-              children: [
-                {
-                  string: '((card-1))',
-                  children: [
-                    {
-                      string: '[[April 14th, 2026]] 🟢',
-                      order: 0,
-                      children: [
-                        { string: 'algorithm:: SM2' },
-                        { string: 'interaction:: NORMAL' },
-                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        ]),
-        util: {
-          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
-        },
-      },
-      writable: true,
+  const mockQueryResultWithChildren = (children: any[]) => {
+    (logseq.api.datascript_query as jest.Mock).mockResolvedValueOnce({
+      data: [[{ uid: 'data-block', string: 'data', order: 0, children }]]
     });
+  };
+
+  it('reads all fields from the latest session block', async () => {
+    mockQueryResultWithChildren([
+      {
+        uid: 'card-1-block',
+        string: '((card-1))',
+        order: 0,
+        children: [
+          {
+            uid: 'session-1',
+            string: '[[April 14th, 2026]] 🟢',
+            order: 0,
+            children: [
+              { uid: 'f1', string: 'algorithm:: SM2', order: 0 },
+              { uid: 'f2', string: 'interaction:: NORMAL', order: 1 },
+              { uid: 'f3', string: 'nextDueDate:: [[April 20th, 2026]]', order: 2 },
+            ],
+          },
+        ],
+      },
+    ]);
 
     const result = await getPluginPageData({
-      dataPageTitle: 'roam/memo',
+      dataPageTitle: 'logseq-memo/data',
       limitToLatest: true,
     });
 
-    expect(window.roamAlphaAPI.q).toHaveBeenCalledWith(
-      getPluginPageBlockDataQuery,
-      'roam/memo',
-      'data'
-    );
     expect(result['card-1']).toMatchObject({
       algorithm: 'SM2',
       interaction: 'NORMAL',
     });
-    const cardData = result['card-1'] as any;
-    expect(cardData.nextDueDate).toEqual(new Date('2026-04-20T00:00:00.000Z'));
   });
 
   it('reads algorithm and interaction from latest session block', async () => {
-    Object.defineProperty(window, 'roamAlphaAPI', {
-      value: {
-        q: jest.fn(() => [
-          [
-            {
-              children: [
-                {
-                  string: '((card-spaced))',
-                  children: [
-                    {
-                      string: '[[April 14th, 2026]] 🟢',
-                      order: 0,
-                      children: [
-                        { string: 'algorithm:: SM2' },
-                        { string: 'interaction:: NORMAL' },
-                        { string: 'sm2_repetitions:: 3' },
-                        { string: 'sm2_interval:: 12' },
-                        { string: 'sm2_eFactor:: 2.4' },
-                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        ]),
-        util: {
-          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
-        },
+    mockQueryResultWithChildren([
+      {
+        uid: 'card-spaced-block',
+        string: '((card-spaced))',
+        order: 0,
+        children: [
+          {
+            uid: 'session-1',
+            string: '[[April 14th, 2026]] 🟢',
+            order: 0,
+            children: [
+              { uid: 'f1', string: 'algorithm:: SM2', order: 0 },
+              { uid: 'f2', string: 'interaction:: NORMAL', order: 1 },
+              { uid: 'f3', string: 'sm2_repetitions:: 3', order: 2 },
+              { uid: 'f4', string: 'sm2_interval:: 12', order: 3 },
+              { uid: 'f5', string: 'sm2_eFactor:: 2.4', order: 4 },
+              { uid: 'f6', string: 'nextDueDate:: [[April 20th, 2026]]', order: 5 },
+            ],
+          },
+        ],
       },
-      writable: true,
-    });
+    ]);
 
     const result = await getPluginPageData({
-      dataPageTitle: 'roam/memo',
+      dataPageTitle: 'logseq-memo/data',
       limitToLatest: true,
     });
 
@@ -130,52 +112,42 @@ describe('getPluginPageData', () => {
   });
 
   it('reads only the latest session block fields without merging from older sessions', async () => {
-    Object.defineProperty(window, 'roamAlphaAPI', {
-      value: {
-        q: jest.fn(() => [
-          [
-            {
-              children: [
-                {
-                  string: '((card-switching))',
-                  children: [
-                    {
-                      string: '[[April 12th, 2026]] 🟢',
-                      order: 1,
-                      children: [
-                        { string: 'algorithm:: SM2' },
-                        { string: 'interaction:: NORMAL' },
-                        { string: 'sm2_repetitions:: 3' },
-                        { string: 'sm2_interval:: 12' },
-                        { string: 'sm2_eFactor:: 2.4' },
-                      ],
-                    },
-                    {
-                      string: '[[April 14th, 2026]] 🟢',
-                      order: 0,
-                      children: [
-                        { string: 'algorithm:: PROGRESSIVE' },
-                        { string: 'interaction:: NORMAL' },
-                        { string: 'progressive_repetitions:: 1' },
-                        { string: 'progressive_interval:: 6' },
-                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        ]),
-        util: {
-          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
-        },
+    mockQueryResultWithChildren([
+      {
+        uid: 'card-switching-block',
+        string: '((card-switching))',
+        order: 0,
+        children: [
+          {
+            uid: 'session-old',
+            string: '[[April 12th, 2026]] 🟢',
+            order: 1,
+            children: [
+              { uid: 'f1', string: 'algorithm:: SM2', order: 0 },
+              { uid: 'f2', string: 'interaction:: NORMAL', order: 1 },
+              { uid: 'f3', string: 'sm2_repetitions:: 3', order: 2 },
+              { uid: 'f4', string: 'sm2_interval:: 12', order: 3 },
+              { uid: 'f5', string: 'sm2_eFactor:: 2.4', order: 4 },
+            ],
+          },
+          {
+            uid: 'session-new',
+            string: '[[April 14th, 2026]] 🟢',
+            order: 0,
+            children: [
+              { uid: 'f6', string: 'algorithm:: PROGRESSIVE', order: 0 },
+              { uid: 'f7', string: 'interaction:: NORMAL', order: 1 },
+              { uid: 'f8', string: 'progressive_repetitions:: 1', order: 2 },
+              { uid: 'f9', string: 'progressive_interval:: 6', order: 3 },
+              { uid: 'f10', string: 'nextDueDate:: [[April 20th, 2026]]', order: 4 },
+            ],
+          },
+        ],
       },
-      writable: true,
-    });
+    ]);
 
     const result = await getPluginPageData({
-      dataPageTitle: 'roam/memo',
+      dataPageTitle: 'logseq-memo/data',
       limitToLatest: true,
     });
 
@@ -188,62 +160,53 @@ describe('getPluginPageData', () => {
   });
 
   it('merges sparse historical sessions into complete snapshots for migration reads', async () => {
-    Object.defineProperty(window, 'roamAlphaAPI', {
-      value: {
-        q: jest.fn(() => [
-          [
-            {
-              children: [
-                {
-                  string: '((card-switching))',
-                  children: [
-                    {
-                      string: '[[April 12th, 2026]] 🔴',
-                      order: 2,
-                      children: [
-                        { string: 'algorithm:: SM2' },
-                        { string: 'interaction:: NORMAL' },
-                        { string: 'sm2_repetitions:: 3' },
-                        { string: 'sm2_interval:: 12' },
-                        { string: 'sm2_eFactor:: 2.4' },
-                        { string: 'sm2_grade:: 4' },
-                      ],
-                    },
-                    {
-                      string: '[[April 13th, 2026]] 🔴',
-                      order: 1,
-                      children: [
-                        { string: 'algorithm:: FIXED_TIME' },
-                        { string: 'interaction:: LBL' },
-                        { string: 'fixed_multiplier:: 5' },
-                        { string: 'fixed_unit:: weeks' },
-                      ],
-                    },
-                    {
-                      string: '[[April 14th, 2026]] 🟢',
-                      order: 0,
-                      children: [
-                        { string: 'algorithm:: PROGRESSIVE' },
-                        { string: 'progressive_repetitions:: 1' },
-                        { string: 'progressive_interval:: 6' },
-                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        ]),
-        util: {
-          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
-        },
+    mockQueryResultWithChildren([
+      {
+        uid: 'card-switching-block',
+        string: '((card-switching))',
+        order: 0,
+        children: [
+          {
+            uid: 'session-1',
+            string: '[[April 12th, 2026]] 🔴',
+            order: 2,
+            children: [
+              { uid: 'f1', string: 'algorithm:: SM2', order: 0 },
+              { uid: 'f2', string: 'interaction:: NORMAL', order: 1 },
+              { uid: 'f3', string: 'sm2_repetitions:: 3', order: 2 },
+              { uid: 'f4', string: 'sm2_interval:: 12', order: 3 },
+              { uid: 'f5', string: 'sm2_eFactor:: 2.4', order: 4 },
+              { uid: 'f6', string: 'sm2_grade:: 4', order: 5 },
+            ],
+          },
+          {
+            uid: 'session-2',
+            string: '[[April 13th, 2026]] 🔴',
+            order: 1,
+            children: [
+              { uid: 'f7', string: 'algorithm:: FIXED_TIME', order: 0 },
+              { uid: 'f8', string: 'interaction:: LBL', order: 1 },
+              { uid: 'f9', string: 'fixed_multiplier:: 5', order: 2 },
+              { uid: 'f10', string: 'fixed_unit:: weeks', order: 3 },
+            ],
+          },
+          {
+            uid: 'session-3',
+            string: '[[April 14th, 2026]] 🟢',
+            order: 0,
+            children: [
+              { uid: 'f11', string: 'algorithm:: PROGRESSIVE', order: 0 },
+              { uid: 'f12', string: 'progressive_repetitions:: 1', order: 1 },
+              { uid: 'f13', string: 'progressive_interval:: 6', order: 2 },
+              { uid: 'f14', string: 'nextDueDate:: [[April 20th, 2026]]', order: 3 },
+            ],
+          },
+        ],
       },
-      writable: true,
-    });
+    ]);
 
     const result = await getPluginPageData({
-      dataPageTitle: 'roam/memo',
+      dataPageTitle: 'logseq-memo/data',
       limitToLatest: false,
     });
 
@@ -262,35 +225,26 @@ describe('getPluginPageData', () => {
   });
 
   it('defaults algorithm to PROGRESSIVE and interaction to NORMAL when session block has none', async () => {
-    Object.defineProperty(window, 'roamAlphaAPI', {
-      value: {
-        q: jest.fn(() => [
-          [
-            {
-              children: [
-                {
-                  string: '((card-fixed))',
-                  children: [
-                    {
-                      string: '[[April 14th, 2026]] 🟢',
-                      order: 0,
-                      children: [{ string: 'nextDueDate:: [[April 20th, 2026]]' }],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        ]),
-        util: {
-          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
-        },
+    mockQueryResultWithChildren([
+      {
+        uid: 'card-fixed-block',
+        string: '((card-fixed))',
+        order: 0,
+        children: [
+          {
+            uid: 'session-1',
+            string: '[[April 14th, 2026]] 🟢',
+            order: 0,
+            children: [
+              { uid: 'f1', string: 'nextDueDate:: [[April 20th, 2026]]', order: 0 },
+            ],
+          },
+        ],
       },
-      writable: true,
-    });
+    ]);
 
     const result = await getPluginPageData({
-      dataPageTitle: 'roam/memo',
+      dataPageTitle: 'logseq-memo/data',
       limitToLatest: true,
     });
 

@@ -1,15 +1,3 @@
-/**
- * App Root Component
- *
- * Orchestrates the entire review workflow:
- * 1. Reads settings and builds tag list (decks)
- * 2. Fetches practice data and cache from the Roam data page
- * 3. Renders sidebar widget and practice overlay
- * 4. Handles card grading via the SM2 / Fixed-Interval algorithms
- *
- * Data flow:
- *   useSettings → useTags → useCachedData → usePracticeData → PracticeOverlay
- */
 import * as React from 'react';
 import * as Blueprint from '@blueprintjs/core';
 import PracticeOverlay from '~/components/overlay/PracticeOverlay';
@@ -133,18 +121,11 @@ const App = () => {
     fetchPracticeDataRef.current = fetchPracticeData;
   }, [fetchPracticeData]);
 
-  const onBlockEnterHandler = (elm: HTMLTextAreaElement) => {
-    const tags = tagsListRef.current.filter((tag) => elm.value.includes(tag));
-    tagsOnEnterRef.current = tags;
+  const onBlockEnterHandler = (_elm: HTMLElement) => {
   };
-  const onBlockLeaveHandler = (elm: HTMLTextAreaElement) => {
+  const onBlockLeaveHandler = (_elm: HTMLElement) => {
     if (showPracticeOverlayRef.current) return;
-
-    const tags = tagsListRef.current.filter((tag) => elm.value.includes(tag));
-
-    if (tagsOnEnterRef.current.length !== tags.length) {
-      fetchPracticeDataRef.current();
-    }
+    fetchPracticeDataRef.current();
   };
 
   useOnBlockInteract({

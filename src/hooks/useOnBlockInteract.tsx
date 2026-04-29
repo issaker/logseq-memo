@@ -1,29 +1,35 @@
-/**
- * useOnBlockInteract Hook
- *
- * Monitors when users enter/leave Roam block text areas.
- * Used to detect tag changes on blocks (adding/removing #memo)
- * and trigger data refresh when tags change.
- *
- * Uses the 'arrive' library to detect dynamically created DOM elements.
- */
 import React from 'react';
-import 'arrive';
+
+const SELECTOR = 'div.ls-block';
 
 const useOnBlockInteract = ({
   onEnterCallback,
   onLeaveCallback,
 }: {
-  onEnterCallback: (_elm: HTMLTextAreaElement) => void;
-  onLeaveCallback: (_elm: HTMLTextAreaElement) => void;
+  onEnterCallback: (_elm: HTMLElement) => void;
+  onLeaveCallback: (_elm: HTMLElement) => void;
 }) => {
   React.useEffect(() => {
-    document.leave('textarea.rm-block-input', onLeaveCallback);
-    document.arrive('textarea.rm-block-input', onEnterCallback);
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = (e.target as HTMLElement).closest(SELECTOR) as HTMLElement;
+      if (target) {
+        onEnterCallback(target);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = (e.target as HTMLElement).closest(SELECTOR) as HTMLElement;
+      if (target) {
+        onLeaveCallback(target);
+      }
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
 
     return () => {
-      document.unbindLeave('textarea.rm-block-input', onLeaveCallback);
-      document.unbindArrive('textarea.rm-block-input', onEnterCallback);
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
     };
   }, [onEnterCallback, onLeaveCallback]);
 };

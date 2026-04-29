@@ -24,7 +24,19 @@ export const simulateMouseClick = (element) => {
 };
 
 export const collapseBlockOnPage = (uid: string) => {
-  return window.roamAlphaAPI.updateBlock({
-    block: { uid, open: false },
-  });
+  const roamBlock = document.querySelector(`[data-uuid="${uid}"] .block-expand .rm-caret`);
+  if (roamBlock) {
+    const mouseClickEvents = ['mouseenter', 'mouseover', 'mousedown', 'click', 'mouseup'];
+    mouseClickEvents.forEach((eventType) =>
+      (roamBlock as HTMLElement).dispatchEvent(
+        new MouseEvent(eventType, {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          buttons: 1,
+        })
+      )
+    );
+  }
+  return Promise.resolve();
 };

@@ -40,3 +40,4 @@ npm-debug.log*
 
 # ESLint cache
 .eslintcache
+logseq-memo/

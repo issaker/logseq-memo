@@ -59,17 +59,11 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
         });
         
         if (existingBlockUid) {
-          await window.roamAlphaAPI.deleteBlock({ block: { uid: existingBlockUid } });
+          await logseq.Editor.removeBlock(existingBlockUid);
         }
 
         // Create new block with updated value
-        await window.roamAlphaAPI.createBlock({
-          location: { 'parent-uid': settingsBlockUid, order: -1 },
-          block: {
-            string: `${key}:: ${value}`,
-            open: false,
-          },
-        });
+        await logseq.Editor.insertBlock(settingsBlockUid, `${key}:: ${value}`);
       } catch (err) {
         console.error(`Memo: Failed to save setting ${key}`, err);
         throw err; // Re-throw to be caught by outer try-catch
@@ -103,18 +97,17 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
     }
 
     // Query for all child blocks of the settings block
-    // Use a simple query that doesn't pass UIDs as parameters in lookup ref position
     const childrenQuery = `
-      [:find ?child-uid ?child-string
+      [:find ?child-uuid ?child-content
        :where
-       [?parent :block/uid "${settingsBlockUid}"]
-       [?child :block/parents ?parent]
-       [?child :block/uid ?child-uid]
-       [?child :block/string ?child-string]
+       [?parent :block/uuid "${settingsBlockUid}"]
+       [?child :block/parent ?parent]
+       [?child :block/uuid ?child-uuid]
+       [?child :block/content ?child-content]
       ]
     `;
     
-    const results = window.roamAlphaAPI.q(childrenQuery);
+    const { data: results } = await logseq.api.datascript_query(childrenQuery);
     
     if (!results || results.length === 0) {
       return null;
@@ -123,10 +116,10 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
     const loadedSettings: Partial<Settings> = {};
     
     // Parse each setting
-    for (const [blockUid, blockString] of results) {
+    for (const [blockUuid, blockContent] of results) {
       try {
-        if (blockString && blockString.includes('::')) {
-          const [keyPart, ...valueParts] = blockString.split('::');
+        if (blockContent && blockContent.includes('::')) {
+          const [keyPart, ...valueParts] = blockContent.split('::');
           const key = keyPart.trim();
           const value = valueParts.join('::').trim();
           
@@ -171,7 +164,7 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
           }
         }
       } catch (err) {
-        console.error('Memo: Error parsing setting from block', blockUid, blockString, err);
+        console.error('Memo: Error parsing setting from block', blockUuid, blockContent, err);
       }
     }
 
